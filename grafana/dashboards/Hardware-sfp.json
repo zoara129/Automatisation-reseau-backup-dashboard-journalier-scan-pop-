@@ -1,0 +1,1326 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "Etat materiel des routeurs : SFP (temperature, tension, courant, puissance optique), ventilateurs, alimentations, detail du chassis",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": 32,
+  "links": [],
+  "panels": [
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "fg2h4oo9wupdsa"
+      },
+      "description": "Température la plus élevée parmi les SFP des routeurs sélectionnés (dernière mesure des 30 dernières minutes).",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 1,
+          "mappings": [],
+          "max": 100,
+          "min": 0,
+          "noValue": "Aucune donnée",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 70
+              },
+              {
+                "color": "red",
+                "value": 90
+              }
+            ]
+          },
+          "unit": "celsius"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "minVizHeight": 75,
+        "minVizWidth": 75,
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "sizing": "auto"
+      },
+      "pluginVersion": "11.2.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "fg2h4oo9wupdsa"
+          },
+          "query": "from(bucket: \"network\")\n  |> range(start: -30m)\n  |> filter(fn: (r) => r._measurement == \"hardware_sfp\" and r._field =~ /temp/)\n  |> filter(fn: (r) => not exists r.test)\n  |> filter(fn: (r) => contains(value: r.router, set: ${router:json}))\n  |> toFloat()\n  |> last()\n  |> group()\n  |> max()",
+          "refId": "A"
+        }
+      ],
+      "title": "Température SFP (max)",
+      "type": "gauge"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "fg2h4oo9wupdsa"
+      },
+      "description": "Courant de polarisation du laser le plus élevé parmi les SFP sélectionnés.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 2,
+          "mappings": [],
+          "max": 15,
+          "min": 0,
+          "noValue": "Aucune donnée",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 12
+              },
+              {
+                "color": "red",
+                "value": 14
+              }
+            ]
+          },
+          "unit": "mamp"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 4,
+        "y": 0
+      },
+      "id": 2,
+      "options": {
+        "minVizHeight": 75,
+        "minVizWidth": 75,
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "sizing": "auto"
+      },
+      "pluginVersion": "11.2.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "fg2h4oo9wupdsa"
+          },
+          "query": "from(bucket: \"network\")\n  |> range(start: -30m)\n  |> filter(fn: (r) => r._measurement == \"hardware_sfp\" and r._field =~ /bias|current/)\n  |> filter(fn: (r) => not exists r.test)\n  |> filter(fn: (r) => contains(value: r.router, set: ${router:json}))\n  |> toFloat()\n  |> last()\n  |> group()\n  |> max()",
+          "refId": "A"
+        }
+      ],
+      "title": "Courant laser (max)",
+      "type": "gauge"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "fg2h4oo9wupdsa"
+      },
+      "description": "Tension la plus basse parmi les SFP sélectionnés.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "max": 4.5,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 3
+              },
+              {
+                "color": "green",
+                "value": 3.13
+              },
+              {
+                "color": "#EAB839",
+                "value": 3.47
+              },
+              {
+                "color": "red",
+                "value": 3.6
+              }
+            ]
+          },
+          "unit": "volt"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 0
+      },
+      "id": 3,
+      "options": {
+        "minVizHeight": 75,
+        "minVizWidth": 75,
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "sizing": "auto"
+      },
+      "pluginVersion": "11.2.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "fg2h4oo9wupdsa"
+          },
+          "query": "from(bucket: \"network\")\n  |> range(start: -30m)\n  |> filter(fn: (r) => r._measurement == \"hardware_sfp\" and r._field =~ /volt/)\n  |> filter(fn: (r) => not exists r.test)\n  |> filter(fn: (r) => contains(value: r.router, set: ${router:json}))\n  |> toFloat()\n  |> last()\n  |> group()\n  |> min()",
+          "refId": "A"
+        }
+      ],
+      "title": "Tension SFP (min)",
+      "type": "gauge"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "fg2h4oo9wupdsa"
+      },
+      "description": "OK si tous les indicateurs du châssis (alimentations A/B, ventilateurs, surchauffe) valent 1 sur tous les routeurs sélectionnés.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [
+            {
+              "options": {
+                "0": {
+                  "color": "red",
+                  "index": 0,
+                  "text": "DÉFAUT"
+                },
+                "1": {
+                  "color": "transparent",
+                  "index": 1,
+                  "text": "OK"
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "noValue": "Aucune donnée",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 5,
+        "x": 12,
+        "y": 0
+      },
+      "id": 6,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.2.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "fg2h4oo9wupdsa"
+          },
+          "query": "from(bucket: \"network\")\n  |> range(start: -30m)\n  |> filter(fn: (r) => r._measurement == \"hardware_chassis\" and r._field != \"fan_count\")\n  |> filter(fn: (r) => not exists r.test)\n  |> filter(fn: (r) => contains(value: r.router, set: ${router:json}))\n  |> toFloat()\n  |> last()\n  |> group()\n  |> min()",
+          "refId": "A"
+        }
+      ],
+      "title": "Châssis (alim, fans, surchauffe)",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "default": true,
+        "type": "influxdb",
+        "uid": "fg2h4oo9wupdsa"
+      },
+      "description": "Âge de la dernière mesure hardware_sfp. Au-delà de 10 minutes, le cron hardware.py a probablement un problème (collecte toutes les 5 min).",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "mappings": [],
+          "noValue": "Aucune mesure depuis plus d'1 h",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 600
+              },
+              {
+                "color": "red",
+                "value": 1200
+              }
+            ]
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 7,
+        "x": 17,
+        "y": 0
+      },
+      "id": 7,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.2.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "fg2h4oo9wupdsa"
+          },
+          "query": "from(bucket: \"network\")\n  |> range(start: -1h)\n  |> filter(fn: (r) => r._measurement == \"hardware_sfp\")\n  |> filter(fn: (r) => not exists r.test)\n  |> keep(columns: [\"_time\"])\n  |> group()\n  |> max(column: \"_time\")\n  |> map(fn: (r) => ({_value: float(v: int(v: now()) - int(v: r._time)) / 1000000000.0}))",
+          "refId": "A"
+        }
+      ],
+      "title": "Dernière mise à jour (il y a)",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "fg2h4oo9wupdsa"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "bars",
+            "fillOpacity": 100,
+            "gradientMode": "hue",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 4
+      },
+      "id": 8,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "hidden",
+          "placement": "right",
+          "showLegend": false
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.2.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "fg2h4oo9wupdsa"
+          },
+          "query": "from(bucket: \"network\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"hardware_sfp\" and r._field =~ /temp/)\n  |> filter(fn: (r) => not exists r.test)\n  |> filter(fn: (r) => contains(value: r.router, set: ${router:json}))\n  |> drop(columns: [\"host\"])\n  |> toFloat()\n  |> aggregateWindow(every: 5m, fn: mean, createEmpty: false)",
+          "refId": "A"
+        }
+      ],
+      "title": "Température SFP",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "default": true,
+        "type": "influxdb",
+        "uid": "fg2h4oo9wupdsa"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "sfp_rx_power_dbm {direction=\"RX\", port=\"1/6/8\", router=\"SAR-8_Tour_87\"}"
+            },
+            "properties": [
+              {
+                "id": "custom.fillOpacity",
+                "value": 25
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 2
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "sfp_tx_power_dbm {direction=\"TX\", port=\"1/6/8\", router=\"SAR-8_Tour_87\"}"
+            },
+            "properties": [
+              {
+                "id": "custom.drawStyle",
+                "value": "line"
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 2
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 0
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 4
+      },
+      "id": 9,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "hidden",
+          "placement": "right",
+          "showLegend": false
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "fg2h4oo9wupdsa"
+          },
+          "query": "import \"experimental\"\n\nfrom(bucket: \"network\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"hardware_sfp\" and r._field =~ /rx|tx.*(pow|dbm)/)\n  |> filter(fn: (r) => not exists r.test)\n  |> filter(fn: (r) => contains(value: r.router, set: ${router:json}))\n  |> drop(columns: [\"host\"])\n  |> toFloat()\n  |> aggregateWindow(every: 5m, fn: mean, createEmpty: false)\n  |> map(fn: (r) => ({r with direction: if r._field =~ /rx/ then \"RX\" else \"TX\"}))\n  |> experimental.group(mode: \"extend\", columns: [\"direction\"])",
+          "refId": "A"
+        }
+      ],
+      "title": "Puissance optique SFP (Rx / Tx)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "fg2h4oo9wupdsa"
+      },
+      "description": "Nombre de ventilateurs (fan_count) par routeur. La vitesse en % n'est pas disponible sur le 7705 SAR via la CLI utilisée.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "stepAfter",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "decimals": 0,
+          "displayName": "${__field.labels.router}",
+          "mappings": [],
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 4
+      },
+      "id": 10,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "fg2h4oo9wupdsa"
+          },
+          "query": "from(bucket: \"network\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"hardware_chassis\" and r._field == \"fan_count\")\n  |> filter(fn: (r) => not exists r.test)\n  |> filter(fn: (r) => contains(value: r.router, set: ${router:json}))\n  |> drop(columns: [\"host\"])\n  |> toFloat()\n  |> aggregateWindow(every: 5m, fn: min, createEmpty: false)",
+          "refId": "A"
+        }
+      ],
+      "title": "Ventilateurs actifs",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "fg2h4oo9wupdsa"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "dashed"
+            }
+          },
+          "decimals": 2,
+          "displayName": "${__field.labels.router} ${__field.labels.port}",
+          "mappings": [],
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 12
+              },
+              {
+                "color": "red",
+                "value": 14
+              }
+            ]
+          },
+          "unit": "mamp"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 12
+      },
+      "id": 17,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "fg2h4oo9wupdsa"
+          },
+          "query": "from(bucket: \"network\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"hardware_sfp\" and r._field =~ /bias|current/)\n  |> filter(fn: (r) => not exists r.test)\n  |> filter(fn: (r) => contains(value: r.router, set: ${router:json}))\n  |> drop(columns: [\"host\"])\n  |> toFloat()\n  |> aggregateWindow(every: 5m, fn: mean, createEmpty: false)",
+          "refId": "A"
+        }
+      ],
+      "title": "Courant laser (mA)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "fg2h4oo9wupdsa"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "axisSoftMax": 3.7,
+            "axisSoftMin": 3,
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "dashed"
+            }
+          },
+          "decimals": 2,
+          "displayName": "${__field.labels.router} ${__field.labels.port}",
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 3
+              },
+              {
+                "color": "green",
+                "value": 3.13
+              },
+              {
+                "color": "#EAB839",
+                "value": 3.47
+              },
+              {
+                "color": "red",
+                "value": 3.6
+              }
+            ]
+          },
+          "unit": "volt"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 12
+      },
+      "id": 18,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "fg2h4oo9wupdsa"
+          },
+          "query": "from(bucket: \"network\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"hardware_sfp\" and r._field =~ /volt/)\n  |> filter(fn: (r) => not exists r.test)\n  |> filter(fn: (r) => contains(value: r.router, set: ${router:json}))\n  |> drop(columns: [\"host\"])\n  |> toFloat()\n  |> aggregateWindow(every: 5m, fn: mean, createEmpty: false)",
+          "refId": "A"
+        }
+      ],
+      "title": "Tension SFP (V)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "fg2h4oo9wupdsa"
+      },
+      "description": "Un bandeau par indicateur du châssis et par routeur : vert = OK (1), rouge = DÉFAUT (0). Permet de voir quand et quel indicateur a lâché.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "continuous-GrYlRd"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 12
+      },
+      "id": 19,
+      "options": {
+        "displayMode": "lcd",
+        "maxVizHeight": 300,
+        "minVizHeight": 16,
+        "minVizWidth": 8,
+        "namePlacement": "auto",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "sizing": "auto",
+        "valueMode": "color"
+      },
+      "pluginVersion": "11.2.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "fg2h4oo9wupdsa"
+          },
+          "query": "from(bucket: \"network\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"hardware_chassis\" and r._field != \"fan_count\")\n  |> filter(fn: (r) => not exists r.test)\n  |> filter(fn: (r) => contains(value: r.router, set: ${router:json}))\n  |> drop(columns: [\"host\"])\n  |> toFloat()\n  |> aggregateWindow(every: 5m, fn: min, createEmpty: false)",
+          "refId": "A"
+        }
+      ],
+      "title": "État du châssis dans le temps",
+      "type": "bargauge"
+    },
+    {
+      "description": "Alertes Grafana en cours (Firing, Pending, No data, Error). Pour ne voir que le matériel, ajoutez un label categorie=hardware aux règles matérielles puis filtrez ici par ce label.",
+      "gridPos": {
+        "h": 4,
+        "w": 24,
+        "x": 0,
+        "y": 20
+      },
+      "id": 12,
+      "options": {
+        "alertInstanceLabelFilter": "",
+        "alertName": "",
+        "dashboardAlerts": false,
+        "groupBy": [],
+        "groupMode": "default",
+        "maxItems": 10,
+        "showInstances": false,
+        "sortOrder": 1,
+        "stateFilter": {
+          "error": true,
+          "firing": true,
+          "noData": true,
+          "normal": false,
+          "pending": true
+        },
+        "viewMode": "list"
+      },
+      "title": "Alertes Hardware",
+      "type": "alertlist"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "fg2h4oo9wupdsa"
+      },
+      "description": "Une ligne par routeur et par port SFP supervisé (dernière mesure des 30 dernières minutes).",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "decimals": 2,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Temp SFP (°C)"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "celsius"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green"
+                    },
+                    {
+                      "color": "orange",
+                      "value": 70
+                    },
+                    {
+                      "color": "red",
+                      "value": 90
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Rx (dBm)"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red"
+                    },
+                    {
+                      "color": "orange",
+                      "value": -17
+                    },
+                    {
+                      "color": "green",
+                      "value": -14
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Ventilateurs"
+            },
+            "properties": [
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red"
+                    },
+                    {
+                      "color": "green",
+                      "value": 1
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Statut"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "0": {
+                        "color": "red",
+                        "index": 0,
+                        "text": "DÉFAUT"
+                      },
+                      "1": {
+                        "color": "green",
+                        "index": 1,
+                        "text": "OK"
+                      }
+                    },
+                    "type": "value"
+                  }
+                ]
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red"
+                    },
+                    {
+                      "color": "green",
+                      "value": 1
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 24,
+        "x": 0,
+        "y": 24
+      },
+      "id": 11,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": false,
+            "displayName": "Routeur"
+          }
+        ]
+      },
+      "pluginVersion": "11.2.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "fg2h4oo9wupdsa"
+          },
+          "query": "sfp = from(bucket: \"network\")\n  |> range(start: -30m)\n  |> filter(fn: (r) => r._measurement == \"hardware_sfp\" and r._field =~ /temp|volt|bias|current|rx|tx/)\n  |> filter(fn: (r) => not exists r.test)\n  |> filter(fn: (r) => contains(value: r.router, set: ${router:json}))\n  |> toFloat()\n  |> last()\n  |> map(fn: (r) => ({r with _field: if r._field =~ /temp/ then \"Temp SFP (°C)\" else if r._field =~ /volt/ then \"Tension (V)\" else if r._field =~ /bias|current/ then \"Courant (mA)\" else if r._field =~ /rx/ then \"Rx (dBm)\" else \"Tx (dBm)\"}))\n  |> keep(columns: [\"router\", \"port\", \"_field\", \"_value\"])\n  |> group()\n  |> pivot(rowKey: [\"router\", \"port\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n\nbase = from(bucket: \"network\")\n  |> range(start: -30m)\n  |> filter(fn: (r) => r._measurement == \"hardware_chassis\")\n  |> filter(fn: (r) => not exists r.test)\n  |> filter(fn: (r) => contains(value: r.router, set: ${router:json}))\n  |> toFloat()\n  |> last()\n\nfans = base\n  |> filter(fn: (r) => r._field == \"fan_count\")\n  |> keep(columns: [\"router\", \"_value\"])\n  |> rename(columns: {_value: \"Ventilateurs\"})\n  |> group()\n\nstatus = base\n  |> filter(fn: (r) => r._field != \"fan_count\")\n  |> group(columns: [\"router\"])\n  |> min()\n  |> keep(columns: [\"router\", \"_value\"])\n  |> rename(columns: {_value: \"Statut\"})\n  |> group()\n\nchassis = join(tables: {f: fans, s: status}, on: [\"router\"])\n\njoin(tables: {a: sfp, b: chassis}, on: [\"router\"])\n  |> yield(name: \"hardware\")",
+          "refId": "A"
+        }
+      ],
+      "title": "État du matériel par routeur",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "_start": true,
+              "_stop": true,
+              "result": true,
+              "table": true
+            },
+            "renameByName": {
+              "port": "Port",
+              "router": "Routeur"
+            }
+          }
+        }
+      ],
+      "type": "table"
+    }
+  ],
+  "refresh": "",
+  "schemaVersion": 39,
+  "tags": [
+    "noc",
+    "hardware & sfp"
+  ],
+  "templating": {
+    "list": [
+      {
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "influxdb",
+          "uid": "fg2h4oo9wupdsa"
+        },
+        "definition": "Valeurs du tag router de hardware_sfp",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Routeur",
+        "multi": true,
+        "name": "router",
+        "options": [],
+        "query": "import \"influxdata/influxdb/schema\"\nschema.tagValues(bucket: \"network\", tag: \"router\", predicate: (r) => r._measurement == \"hardware_sfp\", start: -7d)",
+        "refresh": 2,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "4- NOC - Hardware & SFP -- Etats matériels",
+  "uid": "noc-hardware-sfp-v2",
+  "version": 5,
+  "weekStart": ""
+}

@@ -1,0 +1,964 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "Sauvegardes de configuration et suivi des scripts d'automatisation, tous routeurs",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": 29,
+  "links": [],
+  "panels": [
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "fg2h4oo9wupdsa"
+      },
+      "description": "Stable si aucun routeur n'a une sauvegarde en échec ou de plus de 26 h, et si aucun script suivi (script_run) n'est en échec ou en retard. Ce panneau ne dépend pas du filtre Routeur pour les scripts.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [
+            {
+              "options": {
+                "0": {
+                  "color": "transparent",
+                  "index": 0,
+                  "text": "STABLE"
+                }
+              },
+              "type": "value"
+            },
+            {
+              "options": {
+                "from": 0.5,
+                "result": {
+                  "color": "red",
+                  "index": 1,
+                  "text": "À VÉRIFIER"
+                },
+                "to": 1000000
+              },
+              "type": "range"
+            }
+          ],
+          "noValue": "Aucune donnée",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 3,
+        "x": 0,
+        "y": 0
+      },
+      "id": 5,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "value",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.2.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "fg2h4oo9wupdsa"
+          },
+          "query": "scripts = from(bucket: \"network\")\n  |> range(start: -7d)\n  |> filter(fn: (r) => r._measurement == \"script_run\" and r._field == \"duration_s\")\n  |> filter(fn: (r) => not exists r.test)\n  |> group(columns: [\"script\"])\n  |> last()\n  |> map(fn: (r) => ({_value: if r.status == \"fail\" or float(v: int(v: now()) - int(v: r._time)) / 1000000000.0 > (if r.script == \"topology.py\" or r.script == \"hardware.py\" then 900.0 else 93600.0) then 1.0 else 0.0}))\n  |> group()\n  |> sum()\n\nbackups = from(bucket: \"network\")\n  |> range(start: -7d)\n  |> filter(fn: (r) => r._measurement == \"backup_status\" and r._field =~ /success|status|^ok$/)\n  |> filter(fn: (r) => not exists r.test)\n  |> filter(fn: (r) => contains(value: r.router, set: ${router:json}))\n  |> toFloat()\n  |> last()\n  |> map(fn: (r) => ({_value: if r._value < 1.0 or float(v: int(v: now()) - int(v: r._time)) / 1000000000.0 > 93600.0 then 1.0 else 0.0}))\n  |> group()\n  |> sum()\n\nunion(tables: [scripts, backups])\n  |> group()\n  |> sum()",
+          "refId": "A"
+        }
+      ],
+      "title": "Système",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "fg2h4oo9wupdsa"
+      },
+      "description": "Nombre de sauvegardes en échec dans les dernières 24 h. Affiche 0 aussi quand aucun point d'échec n'a été écrit : backup.py doit écrire un point success=0 pour un routeur injoignable.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "mappings": [],
+          "noValue": "0",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "transparent",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 3,
+        "x": 3,
+        "y": 0
+      },
+      "id": 3,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.2.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "fg2h4oo9wupdsa"
+          },
+          "query": "from(bucket: \"network\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r._measurement == \"backup_status\" and r._field =~ /success|status|^ok$/)\n  |> filter(fn: (r) => not exists r.test)\n  |> filter(fn: (r) => contains(value: r.router, set: ${router:json}))\n  |> toFloat()\n  |> filter(fn: (r) => r._value < 1.0)\n  |> group()\n  |> count()\n  |> map(fn: (r) => ({_value: float(v: r._value)}))",
+          "refId": "A"
+        }
+      ],
+      "title": "Échecs (24 h)",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "default": true,
+        "type": "influxdb",
+        "uid": "fg2h4oo9wupdsa"
+      },
+      "description": "Temps écoulé depuis le dernier point backup_status. Le cron tourne à 02h30 : orange au-delà de 26 h, rouge au-delà de 50 h.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 31,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "stepBefore",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 9,
+        "x": 6,
+        "y": 0
+      },
+      "id": 4,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "hidden",
+          "placement": "right",
+          "showLegend": false
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.2.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "fg2h4oo9wupdsa"
+          },
+          "query": "from(bucket: \"network\")\n  |> range(start: -7d)\n  |> filter(fn: (r) => r._measurement == \"backup_status\" and r._field =~ /success|status|^ok$/)\n  |> filter(fn: (r) => not exists r.test)\n  |> filter(fn: (r) => contains(value: r.router, set: ${router:json}))\n  |> toFloat()\n  |> filter(fn: (r) => r._value >= 1.0)\n  |> group()\n  |> map(fn: (r) => ({_time: r._time, _value: r._value, ts: int(v: r._time)}))\n  |> aggregateWindow(every: 1h, fn: last, column: \"ts\", createEmpty: true)\n  |> fill(column: \"ts\", usePrevious: true)\n  |> filter(fn: (r) => exists r.ts)\n  |> map(fn: (r) => ({_time: r._time, _value: float(v: int(v: r._time) - r.ts) / 3600000000000.0}))",
+          "refId": "A"
+        }
+      ],
+      "title": "Dernier backup (il y a)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "default": true,
+        "type": "influxdb",
+        "uid": "fg2h4oo9wupdsa"
+      },
+      "description": "Nombre de sauvegardes réussies et en échec par jour, tous routeurs sélectionnés. Le panneau force une période de 7 jours quelle que soit la période du dashboard.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 9,
+        "x": 15,
+        "y": 0
+      },
+      "id": 6,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.97,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "orientation": "auto",
+        "showValue": "auto",
+        "stacking": "none",
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        },
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "11.2.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "fg2h4oo9wupdsa"
+          },
+          "query": "import \"timezone\"\n\noption location = timezone.location(name: \"Indian/Antananarivo\")\n\nfrom(bucket: \"network\")\n  |> range(start: -7d)\n  |> filter(fn: (r) => r._measurement == \"backup_status\" and r._field =~ /success|status|^ok$/)\n  |> filter(fn: (r) => not exists r.test)\n  |> filter(fn: (r) => contains(value: r.router, set: ${router:json}))\n  |> toFloat()\n  |> filter(fn: (r) => r._value >= 1.0)\n  |> group()\n  |> aggregateWindow(every: 1d, fn: count, createEmpty: true)\n  |> fill(column: \"_value\", value: 0)",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "fg2h4oo9wupdsa"
+          },
+          "query": "from(bucket: \"network\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"backup_status\" and r._field =~ /success|status|^ok$/)\n  |> filter(fn: (r) => not exists r.test)\n  |> filter(fn: (r) => contains(value: r.router, set: ${router:json}))\n  |> toFloat()\n  |> filter(fn: (r) => r._value < 1.0)\n  |> group()\n  |> aggregateWindow(every: 1d, fn: count, createEmpty: false)",
+          "refId": "B"
+        }
+      ],
+      "timeFrom": "7d",
+      "title": "Historique des sauvegardes (7 jours, par jour)",
+      "type": "barchart"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "fg2h4oo9wupdsa"
+      },
+      "description": "Routeurs dont la dernière sauvegarde a réussi il y a moins de 26 h, sur le nombre de routeurs vus dans backup_status depuis 7 jours.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "green",
+            "mode": "fixed"
+          },
+          "mappings": [],
+          "noValue": "Aucune donnée",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 6,
+        "x": 0,
+        "y": 5
+      },
+      "id": 1,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "/^_value$/",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "value",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.2.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "fg2h4oo9wupdsa"
+          },
+          "query": "from(bucket: \"network\")\n  |> range(start: -7d)\n  |> filter(fn: (r) => r._measurement == \"backup_status\" and r._field =~ /success|status|^ok$/)\n  |> filter(fn: (r) => not exists r.test)\n  |> filter(fn: (r) => contains(value: r.router, set: ${router:json}))\n  |> toFloat()\n  |> last()\n  |> map(fn: (r) => ({router: r.router, ok: if r._value >= 1.0 and float(v: int(v: now()) - int(v: r._time)) / 1000000000.0 <= 93600.0 then 1.0 else 0.0}))\n  |> group()\n  |> reduce(identity: {ok: 0.0, total: 0.0}, fn: (r, accumulator) => ({ok: accumulator.ok + r.ok, total: accumulator.total + 1.0}))\n  |> map(fn: (r) => ({_value: string(v: int(v: r.ok)) + \" / \" + string(v: int(v: r.total))}))",
+          "refId": "A"
+        }
+      ],
+      "title": "Sauvegardes OK",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "fg2h4oo9wupdsa"
+      },
+      "description": "Dernière sauvegarde connue de chaque routeur (7 derniers jours). EN RETARD : plus de 26 h.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "État"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "ECHEC": {
+                        "color": "red",
+                        "index": 1,
+                        "text": "ÉCHEC"
+                      },
+                      "EN RETARD": {
+                        "color": "orange",
+                        "index": 2,
+                        "text": "EN RETARD"
+                      },
+                      "OK": {
+                        "color": "green",
+                        "index": 0,
+                        "text": "OK"
+                      }
+                    },
+                    "type": "value"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Dernière sauvegarde"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "dateTimeAsLocal"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Il y a"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "s"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
+      "id": 8,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": false,
+            "displayName": "Routeur"
+          }
+        ]
+      },
+      "pluginVersion": "11.2.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "fg2h4oo9wupdsa"
+          },
+          "query": "from(bucket: \"network\")\n  |> range(start: -7d)\n  |> filter(fn: (r) => r._measurement == \"backup_status\" and r._field =~ /success|status|^ok$/)\n  |> filter(fn: (r) => not exists r.test)\n  |> filter(fn: (r) => contains(value: r.router, set: ${router:json}))\n  |> toFloat()\n  |> last()\n  |> map(fn: (r) => {\n      age = float(v: int(v: now()) - int(v: r._time)) / 1000000000.0\n      return {router: r.router, run: r._time, age: age, state: if r._value < 1.0 then \"ECHEC\" else if age > 93600.0 then \"EN RETARD\" else \"OK\"}\n    })\n  |> group()\n  |> sort(columns: [\"router\"])",
+          "refId": "A"
+        }
+      ],
+      "title": "Sauvegardes par routeur",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "result": true,
+              "table": true
+            },
+            "indexByName": {
+              "age": 3,
+              "router": 0,
+              "run": 2,
+              "state": 1
+            },
+            "renameByName": {
+              "age": "Il y a",
+              "router": "Routeur",
+              "run": "Dernière sauvegarde",
+              "state": "État"
+            }
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "fg2h4oo9wupdsa"
+      },
+      "description": "Dernière exécution de chaque script qui écrit la mesure script_run. EN RETARD : plus de 15 min pour topology.py et hardware.py, plus de 26 h pour les autres.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "État"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "ECHEC": {
+                        "color": "red",
+                        "index": 1,
+                        "text": "ÉCHEC"
+                      },
+                      "EN RETARD": {
+                        "color": "orange",
+                        "index": 2,
+                        "text": "EN RETARD"
+                      },
+                      "OK": {
+                        "color": "green",
+                        "index": 0,
+                        "text": "OK"
+                      }
+                    },
+                    "type": "value"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Dernière exécution"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "dateTimeAsLocal"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Il y a"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "s"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Durée"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "s"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      },
+      "id": 7,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "11.2.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "fg2h4oo9wupdsa"
+          },
+          "query": "from(bucket: \"network\")\n  |> range(start: -7d)\n  |> filter(fn: (r) => r._measurement == \"script_run\" and r._field == \"duration_s\")\n  |> filter(fn: (r) => not exists r.test)\n  |> group(columns: [\"script\"])\n  |> last()\n  |> map(fn: (r) => {\n      age = float(v: int(v: now()) - int(v: r._time)) / 1000000000.0\n      limit = if r.script == \"topology.py\" or r.script == \"hardware.py\" then 900.0 else 93600.0\n      return {script: r.script, run: r._time, age: age, duration: r._value, state: if r.status == \"fail\" then \"ECHEC\" else if age > limit then \"EN RETARD\" else \"OK\"}\n    })\n  |> group()\n  |> sort(columns: [\"script\"])",
+          "refId": "A"
+        }
+      ],
+      "title": "Scripts d'automatisation",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "result": true,
+              "table": true
+            },
+            "indexByName": {
+              "age": 3,
+              "duration": 4,
+              "run": 2,
+              "script": 0,
+              "state": 1
+            },
+            "renameByName": {
+              "age": "Il y a",
+              "duration": "Durée",
+              "run": "Dernière exécution",
+              "script": "Script",
+              "state": "État"
+            }
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "fg2h4oo9wupdsa"
+      },
+      "description": "Les 15 dernières exécutions de scripts (mesure script_run, champ message). Le message ne doit jamais contenir de mot de passe ni de morceau de configuration.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Statut"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "fail": {
+                        "color": "red",
+                        "index": 1,
+                        "text": "Échec"
+                      },
+                      "ok": {
+                        "color": "green",
+                        "index": 0,
+                        "text": "Succès"
+                      }
+                    },
+                    "type": "value"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Date/Heure"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "dateTimeAsLocal"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 14
+      },
+      "id": 9,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "11.2.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "fg2h4oo9wupdsa"
+          },
+          "query": "from(bucket: \"network\")\n  |> range(start: -7d)\n  |> filter(fn: (r) => r._measurement == \"script_run\" and r._field == \"message\")\n  |> filter(fn: (r) => not exists r.test)\n  |> group()\n  |> sort(columns: [\"_time\"], desc: true)\n  |> limit(n: 15)\n  |> keep(columns: [\"_time\", \"script\", \"status\", \"_value\"])",
+          "refId": "A"
+        }
+      ],
+      "title": "Dernières exécutions",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "result": true,
+              "table": true
+            },
+            "indexByName": {
+              "_time": 0,
+              "_value": 3,
+              "script": 1,
+              "status": 2
+            },
+            "renameByName": {
+              "_time": "Date/Heure",
+              "_value": "Message",
+              "script": "Script",
+              "status": "Statut"
+            }
+          }
+        }
+      ],
+      "type": "table"
+    }
+  ],
+  "refresh": "1m",
+  "schemaVersion": 39,
+  "tags": [
+    "noc",
+    "automation & backup"
+  ],
+  "templating": {
+    "list": [
+      {
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "influxdb",
+          "uid": "fg2h4oo9wupdsa"
+        },
+        "definition": "Valeurs du tag router de backup_status",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Routeur",
+        "multi": true,
+        "name": "router",
+        "options": [],
+        "query": "import \"influxdata/influxdb/schema\"\nschema.tagValues(bucket: \"network\", tag: \"router\", predicate: (r) => r._measurement == \"backup_status\", start: -30d)",
+        "refresh": 2,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "3- NOC - Backup & Automation",
+  "uid": "noc-backup-automation",
+  "version": 10,
+  "weekStart": ""
+}

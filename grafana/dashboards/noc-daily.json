@@ -1,0 +1,1102 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "Vue d'ensemble de l'infrastructure réseau (tous les routeurs, filtre Routeur)",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": 30,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "fg2h4oo9wupdsa"
+      },
+      "description": "Routeurs ayant envoyé des données matériel depuis moins de 10 min",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "mappings": [],
+          "noValue": "0",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "value",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.2.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "fg2h4oo9wupdsa"
+          },
+          "query": "from(bucket: \"network\")\n  |> range(start: -10m)\n  |> filter(fn: (r) => r._measurement == \"hardware_chassis\")\n  |> filter(fn: (r) => r.router =~ /^${router:regex}$/)\n  |> filter(fn: (r) => not exists r.test or r.test != \"true\")\n  |> keep(columns: [\"router\"])\n  |> group()\n  |> distinct(column: \"router\")\n  |> count()",
+          "refId": "A"
+        }
+      ],
+      "title": "Routeurs UP",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "fg2h4oo9wupdsa"
+      },
+      "description": "Routeurs vus dans les dernières 24 h mais sans données depuis plus de 10 min",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "mappings": [
+            {
+              "options": {
+                "0": {
+                  "index": 0,
+                  "text": "✓ Aucun"
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "noValue": "0",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 3,
+        "y": 0
+      },
+      "id": 2,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "value",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.2.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "fg2h4oo9wupdsa"
+          },
+          "query": "from(bucket: \"network\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r._measurement == \"hardware_chassis\")\n  |> filter(fn: (r) => r.router =~ /^${router:regex}$/)\n  |> filter(fn: (r) => not exists r.test or r.test != \"true\")\n  |> keep(columns: [\"_time\", \"router\"])\n  |> group(columns: [\"router\"])\n  |> max(column: \"_time\")\n  |> filter(fn: (r) => r._time < time(v: int(v: now()) - 600000000000))\n  |> group()\n  |> count(column: \"router\")\n  |> rename(columns: {router: \"_value\"})",
+          "refId": "A"
+        }
+      ],
+      "title": "Routeurs DOWN",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "fg2h4oo9wupdsa"
+      },
+      "description": "Ports activés (admin) qui sont réellement UP",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "mappings": [],
+          "max": 100,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "#F59E0B",
+                "value": 70
+              },
+              {
+                "color": "green",
+                "value": 100
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 6,
+        "y": 0
+      },
+      "id": 3,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.2.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "fg2h4oo9wupdsa"
+          },
+          "query": "from(bucket: \"network\")\n  |> range(start: -10m)\n  |> filter(fn: (r) => r._measurement == \"interface\" and (r._field == \"${f_oper}\" or r._field == \"${f_admin}\"))\n  |> filter(fn: (r) => r.router =~ /^${router:regex}$/)\n  |> last()\n  |> group()\n  |> reduce(\n      identity: {up: 0, total: 0},\n      fn: (r, accumulator) => ({\n        up: if r._field == \"${f_oper}\" and float(v: r._value) == 1.0 then accumulator.up + 1 else accumulator.up,\n        total: if r._field == \"${f_admin}\" and float(v: r._value) == 1.0 then accumulator.total + 1 else accumulator.total\n      })\n  )\n  |> map(fn: (r) => ({_value: if r.total == 0 then 100.0 else float(v: r.up) * 100.0 / float(v: r.total)}))",
+          "refId": "A"
+        }
+      ],
+      "title": "Liens UP (ports activés)",
+      "type": "stat"
+    },
+    {
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 9,
+        "y": 0
+      },
+      "id": 4,
+      "options": {
+        "alertInstanceLabelFilter": "",
+        "alertName": "",
+        "dashboardAlerts": false,
+        "groupBy": [],
+        "groupMode": "default",
+        "maxItems": 20,
+        "showInstances": true,
+        "sortOrder": 3,
+        "stateFilter": {
+          "error": true,
+          "firing": true,
+          "noData": false,
+          "normal": false,
+          "pending": true
+        },
+        "viewMode": "stat"
+      },
+      "title": "Alertes actives",
+      "type": "alertlist"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "fg2h4oo9wupdsa"
+      },
+      "description": "Alimentations, ventilateurs et surchauffe du châssis",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [
+            {
+              "options": {
+                "0": {
+                  "color": "red",
+                  "index": 1,
+                  "text": "DÉFAUT"
+                },
+                "1": {
+                  "color": "transparent",
+                  "index": 0,
+                  "text": "Aucun défaut"
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#EF4444",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 12,
+        "y": 0
+      },
+      "id": 21,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.2.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "fg2h4oo9wupdsa"
+          },
+          "query": "from(bucket: \"network\")\n  |> range(start: -15m)\n  |> filter(fn: (r) => r._measurement == \"hardware_chassis\" and r._field != \"${f_fan_count}\")\n  |> filter(fn: (r) => not exists r.test or r.test != \"true\")\n  |> last()\n  |> group()\n  |> min()\n  |> keep(columns: [\"_value\"])",
+          "refId": "A"
+        }
+      ],
+      "title": "Matériel",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "fg2h4oo9wupdsa"
+      },
+      "description": "Statut du dernier backup et âge du dernier backup réussi (le pire routeur sélectionné)",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#EF4444",
+                "value": null
+              },
+              {
+                "color": "#2ECC71",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Statut"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "0": {
+                        "color": "red",
+                        "index": 1,
+                        "text": "ÉCHEC"
+                      },
+                      "1": {
+                        "color": "green",
+                        "index": 0,
+                        "text": "OK"
+                      }
+                    },
+                    "type": "value"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Age"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Âge"
+              },
+              {
+                "id": "unit",
+                "value": "h"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "#2ECC71",
+                      "value": null
+                    },
+                    {
+                      "color": "#F59E0B",
+                      "value": 26
+                    },
+                    {
+                      "color": "#EF4444",
+                      "value": 30
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 16,
+        "y": 0
+      },
+      "id": 5,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "horizontal",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "value_and_name",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.2.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "fg2h4oo9wupdsa"
+          },
+          "query": "from(bucket: \"network\")\n  |> range(start: -3d)\n  |> filter(fn: (r) => r._measurement == \"backup_status\" and r._field =~ /^(${f_backup_ok})$/)\n  |> filter(fn: (r) => r.router =~ /^${router:regex}$/)\n  |> filter(fn: (r) => not exists r.test or r.test != \"true\")\n  |> last()\n  |> group()\n  |> min()\n  |> keep(columns: [\"_value\"])\n  |> rename(columns: {_value: \"Statut\"})",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "fg2h4oo9wupdsa"
+          },
+          "query": "from(bucket: \"network\")\n  |> range(start: -14d)\n  |> filter(fn: (r) => r._measurement == \"backup_status\" and r._field =~ /^(${f_backup_ok})$/)\n  |> filter(fn: (r) => r.router =~ /^${router:regex}$/)\n  |> filter(fn: (r) => not exists r.test or r.test != \"true\")\n  |> filter(fn: (r) => float(v: r._value) == 1.0)\n  |> last()\n  |> group()\n  |> min(column: \"_time\")\n  |> map(fn: (r) => ({Age: float(v: int(v: now()) - int(v: r._time)) / 3600000000000.0}))",
+          "refId": "B"
+        }
+      ],
+      "title": "Dernier backup",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "fg2h4oo9wupdsa"
+      },
+      "description": "Âge de la dernière donnée SNMP reçue, pour le routeur le plus en retard. Rouge = la supervision ne reçoit plus rien.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "#F59E0B",
+                "value": 3
+              },
+              {
+                "color": "#EF4444",
+                "value": 10
+              }
+            ]
+          },
+          "unit": "m"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 0
+      },
+      "id": 7,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.2.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "fg2h4oo9wupdsa"
+          },
+          "query": "from(bucket: \"network\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r._measurement == \"interface\")\n  |> filter(fn: (r) => r.router =~ /^${router:regex}$/)\n  |> last()\n  |> keep(columns: [\"_time\", \"router\"])\n  |> group(columns: [\"router\"])\n  |> max(column: \"_time\")\n  |> group()\n  |> min(column: \"_time\")\n  |> map(fn: (r) => ({_value: float(v: int(v: now()) - int(v: r._time)) / 60000000000.0}))",
+          "refId": "A"
+        }
+      ],
+      "title": "Dernière collecte",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "fg2h4oo9wupdsa"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 9,
+        "x": 0,
+        "y": 4
+      },
+      "id": 8,
+      "options": {
+        "edges": {},
+        "nodes": {}
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "fg2h4oo9wupdsa"
+          },
+          "query": "from(bucket: \"network\")\n  |> range(start: -15m)\n  |> filter(fn: (r) => r._measurement == \"topology_link\" and r._field == \"up\")\n  |> filter(fn: (r) => r.router =~ /^${router:regex}$/)\n  |> filter(fn: (r) => not exists r.test or r.test != \"true\")\n  |> last()\n  |> group()\n  |> map(fn: (r) => ({a: if r.router < r.neighbor then r.router else r.neighbor, b: if r.router < r.neighbor then r.neighbor else r.router}))\n  |> map(fn: (r) => ({id: r.a + \" -> \" + r.b, source: r.a, target: r.b}))\n  |> unique(column: \"id\")",
+          "refId": "A"
+        }
+      ],
+      "title": "Topologie IS-IS",
+      "type": "nodeGraph"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "fg2h4oo9wupdsa"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            }
+          },
+          "decimals": 0,
+          "mappings": []
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "UP"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "green",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "DOWN"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 5,
+        "x": 9,
+        "y": 4
+      },
+      "id": 9,
+      "options": {
+        "displayLabels": [
+          "percent"
+        ],
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "values": [
+            "value"
+          ]
+        },
+        "pieType": "donut",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "fg2h4oo9wupdsa"
+          },
+          "query": "from(bucket: \"network\")\n  |> range(start: -10m)\n  |> filter(fn: (r) => r._measurement == \"interface\" and (r._field == \"${f_oper}\" or r._field == \"${f_admin}\"))\n  |> filter(fn: (r) => r.router =~ /^${router:regex}$/)\n  |> last()\n  |> group()\n  |> reduce(\n      identity: {up: 0, total: 0},\n      fn: (r, accumulator) => ({\n        up: if r._field == \"${f_oper}\" and float(v: r._value) == 1.0 then accumulator.up + 1 else accumulator.up,\n        total: if r._field == \"${f_admin}\" and float(v: r._value) == 1.0 then accumulator.total + 1 else accumulator.total\n      })\n  )\n  |> map(fn: (r) => ({UP: r.up, DOWN: r.total - r.up}))",
+          "refId": "A"
+        }
+      ],
+      "title": "État des liens",
+      "type": "piechart"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "fg2h4oo9wupdsa"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "#2ECC71",
+            "mode": "fixed"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "axisSoftMax": 1,
+            "axisSoftMin": 0,
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "decimals": 0,
+          "mappings": [],
+          "max": 1,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 10,
+        "x": 14,
+        "y": 4
+      },
+      "id": 17,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "fg2h4oo9wupdsa"
+          },
+          "query": "from(bucket: \"network\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"backup_status\" and r._field =~ /^(${f_backup_ok})$/)\n  |> filter(fn: (r) => r.router =~ /^${router:regex}$/)\n  |> filter(fn: (r) => not exists r.test or r.test != \"true\")\n  |> aggregateWindow(every: 1d, fn: max, createEmpty: false)\n  |> group(columns: [\"_time\"])\n  |> min()\n  |> group()\n  |> sort(columns: [\"_time\"])\n  |> keep(columns: [\"_time\", \"_value\"])\n  |> rename(columns: {_value: \"Sauvegarde OK\"})",
+          "refId": "A"
+        }
+      ],
+      "timeFrom": "14d",
+      "title": "Historique des sauvegardes (14 j)",
+      "type": "timeseries"
+    },
+    {
+      "gridPos": {
+        "h": 7,
+        "w": 14,
+        "x": 0,
+        "y": 12
+      },
+      "id": 18,
+      "options": {
+        "alertInstanceLabelFilter": "",
+        "alertName": "",
+        "dashboardAlerts": false,
+        "groupBy": [],
+        "groupMode": "default",
+        "maxItems": 10,
+        "showInstances": true,
+        "sortOrder": 5,
+        "stateFilter": {
+          "error": true,
+          "firing": true,
+          "noData": true,
+          "normal": false,
+          "pending": true
+        },
+        "viewMode": "list"
+      },
+      "title": "Alertes en cours",
+      "type": "alertlist"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "fg2h4oo9wupdsa"
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "bps"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Sortant"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "applyToRow": false,
+                  "type": "color-background",
+                  "wrapText": false
+                }
+              },
+              {
+                "id": "displayName",
+                "value": "Sortant"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Entrant"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Entrant"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "semi-dark-green",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "applyToRow": false,
+                  "type": "color-background",
+                  "wrapText": false
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 10,
+        "x": 14,
+        "y": 12
+      },
+      "id": 20,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "11.2.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "fg2h4oo9wupdsa"
+          },
+          "query": "from(bucket: \"network\")\n  |> range(start: -5m)\n  |> filter(fn: (r) => r._measurement == \"interface\")\n  |> filter(fn: (r) => r.router =~ /^${router:regex}$/)\n  |> filter(fn: (r) => r._field == \"ifHCInOctets\" or r._field == \"ifHCOutOctets\")\n  |> filter(fn: (r) => r.ifName =~ /^[0-9]+\\/[0-9]+\\/[0-9]+$/)\n  |> drop(columns: [\"host\"])\n  |> derivative(unit: 1s, nonNegative: true)\n  |> map(fn: (r) => ({r with _value: r._value * 8.0}))\n  |> last()\n  |> group(columns: [\"router\", \"_field\"])\n  |> sum()\n  |> group()\n  |> pivot(rowKey: [\"router\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n  |> rename(columns: {router: \"Routeur\", ifHCInOctets: \"Entrant\", ifHCOutOctets: \"Sortant\"})",
+          "refId": "A"
+        }
+      ],
+      "title": "Débit par routeur",
+      "type": "table"
+    },
+    {
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 19
+      },
+      "id": 11,
+      "options": {
+        "alertInstanceLabelFilter": "",
+        "alertName": "",
+        "dashboardAlerts": false,
+        "groupBy": [],
+        "groupMode": "default",
+        "maxItems": 10,
+        "showInstances": true,
+        "sortOrder": 5,
+        "stateFilter": {
+          "error": true,
+          "firing": true,
+          "noData": true,
+          "normal": true,
+          "pending": true
+        },
+        "viewMode": "list"
+      },
+      "title": "Incidents récents (état des règles)",
+      "type": "alertlist"
+    }
+  ],
+  "refresh": "1m",
+  "schemaVersion": 39,
+  "tags": [
+    "vue globale",
+    "noc"
+  ],
+  "templating": {
+    "list": [
+      {
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "influxdb",
+          "uid": "fg2h4oo9wupdsa"
+        },
+        "definition": "import \"influxdata/influxdb/schema\"\nschema.tagValues(bucket: \"network\", tag: \"router\", start: -30d)",
+        "description": "Choisir un ou plusieurs routeurs",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Routeur",
+        "multi": true,
+        "name": "router",
+        "options": [],
+        "query": "import \"influxdata/influxdb/schema\"\nschema.tagValues(bucket: \"network\", tag: \"router\", start: -30d)",
+        "refresh": 2,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "hide": 2,
+        "label": "Champ octets entrants",
+        "name": "f_in",
+        "query": "ifHCInOctets",
+        "skipUrlSync": true,
+        "type": "constant"
+      },
+      {
+        "hide": 2,
+        "label": "Champ octets sortants",
+        "name": "f_out",
+        "query": "ifHCOutOctets",
+        "skipUrlSync": true,
+        "type": "constant"
+      },
+      {
+        "hide": 2,
+        "label": "Champ état réel",
+        "name": "f_oper",
+        "query": "ifOperStatus",
+        "skipUrlSync": true,
+        "type": "constant"
+      },
+      {
+        "hide": 2,
+        "label": "Champ état admin",
+        "name": "f_admin",
+        "query": "ifAdminStatus",
+        "skipUrlSync": true,
+        "type": "constant"
+      },
+      {
+        "hide": 2,
+        "label": "Regex champ température SFP",
+        "name": "f_temp",
+        "query": "temp",
+        "skipUrlSync": true,
+        "type": "constant"
+      },
+      {
+        "hide": 2,
+        "label": "Regex champ tension SFP",
+        "name": "f_volt",
+        "query": "volt",
+        "skipUrlSync": true,
+        "type": "constant"
+      },
+      {
+        "hide": 2,
+        "label": "Regex champ courant laser",
+        "name": "f_bias",
+        "query": "bias|current|courant",
+        "skipUrlSync": true,
+        "type": "constant"
+      },
+      {
+        "hide": 2,
+        "label": "Champ nombre de ventilateurs",
+        "name": "f_fan_count",
+        "query": "fan_count",
+        "skipUrlSync": true,
+        "type": "constant"
+      },
+      {
+        "hide": 2,
+        "label": "Regex champ succès du backup",
+        "name": "f_backup_ok",
+        "query": "success|ok",
+        "skipUrlSync": true,
+        "type": "constant"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "1- NOC Daily – POP Network (multi-routeurs)",
+  "uid": "noc-daily-pop-v2",
+  "version": 16,
+  "weekStart": ""
+}
