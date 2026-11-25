@@ -1,4 +1,4 @@
-# NOC Monitoring (noc-thz)
+# NOC Monitoring
 
 Bienvenue ! Ce projet sert à garder un œil sur un routeur Nokia 7705 SAR (le **SAR-8_Tour_87**) :
 est-ce que ses ports sont up, combien de trafic passe, avec qui il est connecté. Le tout s'affiche
