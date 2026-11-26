@@ -1,3 +1,4 @@
 routers:
   - name: SAR-8_Tour_87
     ip: 172.17.0.87
+    sfp_ports: ["1/6/8"]

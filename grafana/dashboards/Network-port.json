@@ -19,8 +19,23 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
-  "id": 26,
-  "links": [],
+  "id": 35,
+  "links": [
+    {
+      "asDropdown": true,
+      "icon": "external link",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": [
+        "noc"
+      ],
+      "targetBlank": false,
+      "title": "Dashboard NOC",
+      "tooltip": "",
+      "type": "dashboards",
+      "url": ""
+    }
+  ],
   "liveNow": false,
   "panels": [
     {
@@ -28,6 +43,7 @@
         "type": "influxdb",
         "uid": "fg2h4oo9wupdsa"
       },
+      "description": "Répartition de toutes les interfaces (physiques et logiques) selon les filtres Routeur et Interface.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -103,37 +119,11 @@
                 }
               }
             ]
-          },
-          {
-            "__systemRef": "hideSeriesFrom",
-            "matcher": {
-              "id": "byNames",
-              "options": {
-                "mode": "exclude",
-                "names": [
-                  "ADMIN DOWN",
-                  "DOWN",
-                  "UP"
-                ],
-                "prefix": "All except:",
-                "readOnly": true
-              }
-            },
-            "properties": [
-              {
-                "id": "custom.hideFrom",
-                "value": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": true
-                }
-              }
-            ]
           }
         ]
       },
       "gridPos": {
-        "h": 5,
+        "h": 6,
         "w": 10,
         "x": 0,
         "y": 0
@@ -168,7 +158,7 @@
             "type": "influxdb",
             "uid": "fg2h4oo9wupdsa"
           },
-          "query": "rates = from(bucket: \"network\")\n  |> range(start: -5m)\n  |> filter(fn: (r) => r._measurement == \"interface\" and (r._field == \"ifHCInOctets\" or r._field == \"ifHCOutOctets\"))\n  |> filter(fn: (r) => contains(value: r.router, set: ${router:json}))\n  |> filter(fn: (r) => contains(value: r.ifName, set: ${ifname:json}))\n  |> derivative(unit: 1s, nonNegative: true)\n  |> map(fn: (r) => ({r with _value: r._value * 8.0}))\n  |> last()\n  |> keep(columns: [\"router\", \"ifName\", \"_field\", \"_value\"])\n\nothers = from(bucket: \"network\")\n  |> range(start: -10m)\n  |> filter(fn: (r) => r._measurement == \"interface\" and (r._field == \"ifOperStatus\" or r._field == \"ifAdminStatus\" or r._field == \"${f_speed}\"))\n  |> filter(fn: (r) => contains(value: r.router, set: ${router:json}))\n  |> filter(fn: (r) => contains(value: r.ifName, set: ${ifname:json}))\n  |> last()\n  |> map(fn: (r) => ({r with _value: float(v: r._value)}))\n  |> keep(columns: [\"router\", \"ifName\", \"_field\", \"_value\"])\n\nunion(tables: [rates, others])\n  |> group()\n  |> pivot(rowKey: [\"router\", \"ifName\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n  |> map(fn: (r) => {\n      inp = if exists r.ifHCInOctets then r.ifHCInOctets else 0.0\n      outp = if exists r.ifHCOutOctets then r.ifHCOutOctets else 0.0\n      spd = if exists r.${f_speed} then r.${f_speed} * ${f_speed_mult}.0 else 0.0\n      adm = if exists r.ifAdminStatus then r.ifAdminStatus else 0.0\n      opr = if exists r.ifOperStatus then r.ifOperStatus else 0.0\n      return {\n        Routeur: r.router,\n        Interface: r.ifName,\n        Etat: if adm != 1.0 then \"ADMIN DOWN\" else if opr == 1.0 then \"UP\" else if opr == 6.0 then \"ABSENT\" else \"DOWN\",\n        Capacite: spd,\n        Entrant: inp,\n        Sortant: outp,\n        Utilisation: if spd > 0.0 then (if inp > outp then inp else outp) / spd * 100.0 else -1.0\n      }\n  })\n  |> group()\n  |> reduce(\n      identity: {UP: 0, DOWN: 0, ADMIN_DOWN: 0, ABSENT: 0},\n      fn: (r, accumulator) => ({\n        UP: if r.Etat == \"UP\" then accumulator.UP + 1 else accumulator.UP,\n        DOWN: if r.Etat == \"DOWN\" then accumulator.DOWN + 1 else accumulator.DOWN,\n        ADMIN_DOWN: if r.Etat == \"ADMIN DOWN\" then accumulator.ADMIN_DOWN + 1 else accumulator.ADMIN_DOWN,\n        ABSENT: if r.Etat == \"ABSENT\" then accumulator.ABSENT + 1 else accumulator.ABSENT\n      })\n  )\n  |> rename(columns: {ADMIN_DOWN: \"ADMIN DOWN\"})",
+          "query": "rates = from(bucket: \"network\")\n  |> range(start: -5m)\n  |> filter(fn: (r) => r._measurement == \"interface\" and (r._field == \"ifHCInOctets\" or r._field == \"ifHCOutOctets\"))\n  |> filter(fn: (r) => contains(value: r.router, set: ${router:json}))\n  |> filter(fn: (r) => contains(value: r.ifName, set: ${ifname:json}))\n  |> derivative(unit: 1s, nonNegative: true)\n  |> map(fn: (r) => ({r with _value: r._value * 8.0}))\n  |> last()\n  |> map(fn: (r) => ({r with _value: string(v: r._value)}))\n  |> keep(columns: [\"router\", \"ifName\", \"_field\", \"_value\"])\n\nothers = from(bucket: \"network\")\n  |> range(start: -10m)\n  |> filter(fn: (r) => r._measurement == \"interface\" and (r._field == \"ifOperStatus\" or r._field == \"ifAdminStatus\" or r._field == \"${f_speed}\" or r._field == \"ifAlias\"))\n  |> filter(fn: (r) => contains(value: r.router, set: ${router:json}))\n  |> filter(fn: (r) => contains(value: r.ifName, set: ${ifname:json}))\n  |> last()\n  |> map(fn: (r) => ({r with _value: string(v: r._value)}))\n  |> keep(columns: [\"router\", \"ifName\", \"_field\", \"_value\"])\n\nmain = union(tables: [rates, others])\n  |> group()\n  |> pivot(rowKey: [\"router\", \"ifName\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n  |> map(fn: (r) => {\n      inp = if exists r.ifHCInOctets then float(v: r.ifHCInOctets) else 0.0\n      outp = if exists r.ifHCOutOctets then float(v: r.ifHCOutOctets) else 0.0\n      spd = if exists r.${f_speed} then float(v: r.${f_speed}) * ${f_speed_mult}.0 else 0.0\n      adm = if exists r.ifAdminStatus then float(v: r.ifAdminStatus) else 0.0\n      opr = if exists r.ifOperStatus then float(v: r.ifOperStatus) else 0.0\n      return {\n        Routeur: r.router,\n        Interface: r.ifName,\n        Description: if exists r.ifAlias then r.ifAlias else \"\",\n        Etat: if adm != 1.0 then \"ADMIN DOWN\" else if opr == 1.0 then \"UP\" else if opr == 6.0 then \"ABSENT\" else \"DOWN\",\n        Capacite: spd,\n        Entrant: inp,\n        Sortant: outp,\n        Utilisation: if spd > 0.0 then (if inp > outp then inp else outp) / spd * 100.0 else -1.0\n      }\n  })\nmain\n  |> group()\n  |> reduce(\n      identity: {UP: 0, DOWN: 0, ADMIN_DOWN: 0, ABSENT: 0},\n      fn: (r, accumulator) => ({\n        UP: if r.Etat == \"UP\" then accumulator.UP + 1 else accumulator.UP,\n        DOWN: if r.Etat == \"DOWN\" then accumulator.DOWN + 1 else accumulator.DOWN,\n        ADMIN_DOWN: if r.Etat == \"ADMIN DOWN\" then accumulator.ADMIN_DOWN + 1 else accumulator.ADMIN_DOWN,\n        ABSENT: if r.Etat == \"ABSENT\" then accumulator.ABSENT + 1 else accumulator.ABSENT\n      })\n  )\n  |> rename(columns: {ADMIN_DOWN: \"ADMIN DOWN\"})",
           "refId": "A"
         }
       ],
@@ -177,10 +167,11 @@
     },
     {
       "datasource": {
+        "default": true,
         "type": "influxdb",
         "uid": "fg2h4oo9wupdsa"
       },
-      "description": "Seules les interfaces physiques avec du trafic sont tracées. Utilise les filtres Routeur et Interface en haut pour cibler.",
+      "description": "Interfaces avec du trafic, y compris l'interface logique (To_Tour_87) ; seule l'interface system est exclue. L'interface logique et son port physique affichent le même trafic. Utilise les filtres Routeur et Interface pour cibler.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -204,7 +195,7 @@
               "viz": false
             },
             "insertNulls": false,
-            "lineInterpolation": "stepBefore",
+            "lineInterpolation": "smooth",
             "lineStyle": {
               "fill": "solid"
             },
@@ -266,7 +257,7 @@
             "type": "influxdb",
             "uid": "fg2h4oo9wupdsa"
           },
-          "query": "from(bucket: \"network\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"interface\" and r._field == \"ifHCInOctets\")\n  |> filter(fn: (r) => r.ifName =~ /\\//)\n  |> filter(fn: (r) => contains(value: r.router, set: ${router:json}))\n  |> filter(fn: (r) => contains(value: r.ifName, set: ${ifname:json}))\n  |> drop(columns: [\"host\"])\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: false)\n  |> derivative(unit: 1s, nonNegative: true)\n  |> map(fn: (r) => ({r with _value: r._value * 8.0}))\n  |> filter(fn: (r) => r._value > 0.0)\n  |> keep(columns: [\"_time\", \"_value\", \"router\", \"ifName\"])\n  |> rename(columns: {_value: \"Entrant\"})",
+          "query": "from(bucket: \"network\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"interface\" and r._field == \"ifHCInOctets\")\n  |> filter(fn: (r) => r.ifName != \"system\")\n  |> filter(fn: (r) => r.router =~ /^${router:regex}$/ and r.ifName =~ /^${ifname:regex}$/)\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: false)\n  |> drop(columns: [\"host\"])\n  |> derivative(unit: 1s, nonNegative: true)\n  |> map(fn: (r) => ({r with _value: r._value * 8.0}))\n  |> filter(fn: (r) => r._value > 0.0)\n  |> keep(columns: [\"_time\", \"_value\", \"router\", \"ifName\"])\n  |> rename(columns: {_value: \"Entrant\"})",
           "refId": "A"
         },
         {
@@ -274,20 +265,19 @@
             "type": "influxdb",
             "uid": "fg2h4oo9wupdsa"
           },
-          "query": "from(bucket: \"network\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"interface\" and r._field == \"ifHCOutOctets\")\n  |> filter(fn: (r) => r.ifName =~ /\\//)\n  |> filter(fn: (r) => contains(value: r.router, set: ${router:json}))\n  |> filter(fn: (r) => contains(value: r.ifName, set: ${ifname:json}))\n  |> drop(columns: [\"host\"])\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: false)\n  |> derivative(unit: 1s, nonNegative: true)\n  |> map(fn: (r) => ({r with _value: r._value * 8.0}))\n  |> filter(fn: (r) => r._value > 0.0)\n  |> keep(columns: [\"_time\", \"_value\", \"router\", \"ifName\"])\n  |> rename(columns: {_value: \"Sortant\"})",
+          "query": "from(bucket: \"network\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"interface\" and r._field == \"ifHCOutOctets\")\n  |> filter(fn: (r) => r.ifName != \"system\")\n  |> filter(fn: (r) => contains(value: r.router, set: ${router:json}))\n  |> filter(fn: (r) => contains(value: r.ifName, set: ${ifname:json}))\n  |> drop(columns: [\"host\"])\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: false)\n  |> derivative(unit: 1s, nonNegative: true)\n  |> map(fn: (r) => ({r with _value: r._value * 8.0}))\n  |> filter(fn: (r) => r._value > 0.0)\n  |> keep(columns: [\"_time\", \"_value\", \"router\", \"ifName\"])\n  |> rename(columns: {_value: \"Sortant\"})",
           "refId": "B"
         }
       ],
-      "title": "Trafic entrant/sortie (selon les filtres)",
+      "title": "Trafic entrant/sortant (selon les filtres)",
       "type": "timeseries"
     },
     {
       "datasource": {
-        "default": true,
         "type": "influxdb",
         "uid": "fg2h4oo9wupdsa"
       },
-      "description": "Moyenne de l'utilisation des ports physiques UP. N/D si la capacité n'est pas collectée.",
+      "description": "Utilisation du lien physique UP le plus chargé (le plus grand de l'entrant et du sortant, en % de la capacité). N/D si la capacité n'est pas collectée.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -323,7 +313,7 @@
         "h": 4,
         "w": 10,
         "x": 0,
-        "y": 5
+        "y": 6
       },
       "id": 8,
       "options": {
@@ -348,7 +338,7 @@
             "type": "influxdb",
             "uid": "fg2h4oo9wupdsa"
           },
-          "query": "rates = from(bucket: \"network\")\n  |> range(start: -5m)\n  |> filter(fn: (r) => r._measurement == \"interface\" and (r._field == \"ifHCInOctets\" or r._field == \"ifHCOutOctets\"))\n  |> filter(fn: (r) => contains(value: r.router, set: ${router:json}))\n  |> filter(fn: (r) => contains(value: r.ifName, set: ${ifname:json}))\n  |> derivative(unit: 1s, nonNegative: true)\n  |> map(fn: (r) => ({r with _value: r._value * 8.0}))\n  |> last()\n  |> keep(columns: [\"router\", \"ifName\", \"_field\", \"_value\"])\n\nothers = from(bucket: \"network\")\n  |> range(start: -10m)\n  |> filter(fn: (r) => r._measurement == \"interface\" and (r._field == \"ifOperStatus\" or r._field == \"ifAdminStatus\" or r._field == \"${f_speed}\"))\n  |> filter(fn: (r) => contains(value: r.router, set: ${router:json}))\n  |> filter(fn: (r) => contains(value: r.ifName, set: ${ifname:json}))\n  |> last()\n  |> map(fn: (r) => ({r with _value: float(v: r._value)}))\n  |> keep(columns: [\"router\", \"ifName\", \"_field\", \"_value\"])\n\nunion(tables: [rates, others])\n  |> group()\n  |> pivot(rowKey: [\"router\", \"ifName\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n  |> map(fn: (r) => {\n      inp = if exists r.ifHCInOctets then r.ifHCInOctets else 0.0\n      outp = if exists r.ifHCOutOctets then r.ifHCOutOctets else 0.0\n      spd = if exists r.${f_speed} then r.${f_speed} * ${f_speed_mult}.0 else 0.0\n      adm = if exists r.ifAdminStatus then r.ifAdminStatus else 0.0\n      opr = if exists r.ifOperStatus then r.ifOperStatus else 0.0\n      return {\n        Routeur: r.router,\n        Interface: r.ifName,\n        Etat: if adm != 1.0 then \"ADMIN DOWN\" else if opr == 1.0 then \"UP\" else if opr == 6.0 then \"ABSENT\" else \"DOWN\",\n        Capacite: spd,\n        Entrant: inp,\n        Sortant: outp,\n        Utilisation: if spd > 0.0 then (if inp > outp then inp else outp) / spd * 100.0 else -1.0\n      }\n  })\n  |> filter(fn: (r) => r.Etat == \"UP\" and r.Capacite > 0.0 and r.Interface =~ /\\//)\n  |> group()\n  |> mean(column: \"Utilisation\")\n  |> keep(columns: [\"Utilisation\"])",
+          "query": "rates = from(bucket: \"network\")\n  |> range(start: -5m)\n  |> filter(fn: (r) => r._measurement == \"interface\" and (r._field == \"ifHCInOctets\" or r._field == \"ifHCOutOctets\"))\n  |> filter(fn: (r) => contains(value: r.router, set: ${router:json}))\n  |> filter(fn: (r) => contains(value: r.ifName, set: ${ifname:json}))\n  |> derivative(unit: 1s, nonNegative: true)\n  |> map(fn: (r) => ({r with _value: r._value * 8.0}))\n  |> last()\n  |> map(fn: (r) => ({r with _value: string(v: r._value)}))\n  |> keep(columns: [\"router\", \"ifName\", \"_field\", \"_value\"])\n\nothers = from(bucket: \"network\")\n  |> range(start: -10m)\n  |> filter(fn: (r) => r._measurement == \"interface\" and (r._field == \"ifOperStatus\" or r._field == \"ifAdminStatus\" or r._field == \"${f_speed}\" or r._field == \"ifAlias\"))\n  |> filter(fn: (r) => contains(value: r.router, set: ${router:json}))\n  |> filter(fn: (r) => contains(value: r.ifName, set: ${ifname:json}))\n  |> last()\n  |> map(fn: (r) => ({r with _value: string(v: r._value)}))\n  |> keep(columns: [\"router\", \"ifName\", \"_field\", \"_value\"])\n\nmain = union(tables: [rates, others])\n  |> group()\n  |> pivot(rowKey: [\"router\", \"ifName\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n  |> map(fn: (r) => {\n      inp = if exists r.ifHCInOctets then float(v: r.ifHCInOctets) else 0.0\n      outp = if exists r.ifHCOutOctets then float(v: r.ifHCOutOctets) else 0.0\n      spd = if exists r.${f_speed} then float(v: r.${f_speed}) * ${f_speed_mult}.0 else 0.0\n      adm = if exists r.ifAdminStatus then float(v: r.ifAdminStatus) else 0.0\n      opr = if exists r.ifOperStatus then float(v: r.ifOperStatus) else 0.0\n      return {\n        Routeur: r.router,\n        Interface: r.ifName,\n        Description: if exists r.ifAlias then r.ifAlias else \"\",\n        Etat: if adm != 1.0 then \"ADMIN DOWN\" else if opr == 1.0 then \"UP\" else if opr == 6.0 then \"ABSENT\" else \"DOWN\",\n        Capacite: spd,\n        Entrant: inp,\n        Sortant: outp,\n        Utilisation: if spd > 0.0 then (if inp > outp then inp else outp) / spd * 100.0 else -1.0\n      }\n  })\nmain\n  |> filter(fn: (r) => r.Etat == \"UP\" and r.Capacite > 0.0 and r.Interface =~ /\\//)\n  |> group()\n  |> max(column: \"Utilisation\")\n  |> keep(columns: [\"Utilisation\"])",
           "refId": "A"
         }
       ],
@@ -361,70 +351,108 @@
         "type": "influxdb",
         "uid": "fg2h4oo9wupdsa"
       },
+      "description": "Utilisation (max entrant/sortant, en % de la capacité) par port physique. La ligne rouge marque le seuil de 80 % de l'alerte « Usage lien > 80 % ».",
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "continuous-GrYlRd"
+            "mode": "palette-classic"
           },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "axisSoftMax": 100,
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 4,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "line"
+            }
+          },
+          "decimals": 4,
+          "displayName": "${__field.labels.router} ${__field.labels.ifName}",
           "mappings": [],
           "min": 0,
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
-                "color": "#2ECC71",
+                "color": "green",
                 "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
               }
             ]
           },
-          "unit": "bps"
+          "unit": "percent"
         },
         "overrides": []
       },
       "gridPos": {
-        "h": 6,
+        "h": 7,
         "w": 14,
         "x": 10,
         "y": 7
       },
-      "id": 10,
+      "id": 17,
       "options": {
-        "displayMode": "gradient",
-        "maxVizHeight": 300,
-        "minVizHeight": 16,
-        "minVizWidth": 8,
-        "namePlacement": "left",
-        "orientation": "horizontal",
-        "reduceOptions": {
-          "calcs": [],
-          "fields": "/^Trafic$/",
-          "values": true
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
         },
-        "showUnfilled": true,
-        "sizing": "auto",
-        "valueMode": "color"
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
       },
-      "pluginVersion": "11.2.0",
       "targets": [
         {
           "datasource": {
             "type": "influxdb",
             "uid": "fg2h4oo9wupdsa"
           },
-          "query": "rates = from(bucket: \"network\")\n  |> range(start: -5m)\n  |> filter(fn: (r) => r._measurement == \"interface\" and (r._field == \"ifHCInOctets\" or r._field == \"ifHCOutOctets\"))\n  |> filter(fn: (r) => contains(value: r.router, set: ${router:json}))\n  |> filter(fn: (r) => contains(value: r.ifName, set: ${ifname:json}))\n  |> derivative(unit: 1s, nonNegative: true)\n  |> map(fn: (r) => ({r with _value: r._value * 8.0}))\n  |> last()\n  |> keep(columns: [\"router\", \"ifName\", \"_field\", \"_value\"])\n\nothers = from(bucket: \"network\")\n  |> range(start: -10m)\n  |> filter(fn: (r) => r._measurement == \"interface\" and (r._field == \"ifOperStatus\" or r._field == \"ifAdminStatus\" or r._field == \"${f_speed}\"))\n  |> filter(fn: (r) => contains(value: r.router, set: ${router:json}))\n  |> filter(fn: (r) => contains(value: r.ifName, set: ${ifname:json}))\n  |> last()\n  |> map(fn: (r) => ({r with _value: float(v: r._value)}))\n  |> keep(columns: [\"router\", \"ifName\", \"_field\", \"_value\"])\n\nunion(tables: [rates, others])\n  |> group()\n  |> pivot(rowKey: [\"router\", \"ifName\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n  |> map(fn: (r) => {\n      inp = if exists r.ifHCInOctets then r.ifHCInOctets else 0.0\n      outp = if exists r.ifHCOutOctets then r.ifHCOutOctets else 0.0\n      spd = if exists r.${f_speed} then r.${f_speed} * ${f_speed_mult}.0 else 0.0\n      adm = if exists r.ifAdminStatus then r.ifAdminStatus else 0.0\n      opr = if exists r.ifOperStatus then r.ifOperStatus else 0.0\n      return {\n        Routeur: r.router,\n        Interface: r.ifName,\n        Etat: if adm != 1.0 then \"ADMIN DOWN\" else if opr == 1.0 then \"UP\" else if opr == 6.0 then \"ABSENT\" else \"DOWN\",\n        Capacite: spd,\n        Entrant: inp,\n        Sortant: outp,\n        Utilisation: if spd > 0.0 then (if inp > outp then inp else outp) / spd * 100.0 else -1.0\n      }\n  })\n  |> filter(fn: (r) => r.Interface =~ /\\//)\n  |> map(fn: (r) => ({Interface: r.Routeur + \" · \" + r.Interface, Trafic: r.Entrant + r.Sortant}))\n  |> group()\n  |> sort(columns: [\"Trafic\"], desc: true)\n  |> limit(n: 5)",
+          "query": "rates = from(bucket: \"network\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"interface\" and (r._field == \"ifHCInOctets\" or r._field == \"ifHCOutOctets\"))\n  |> filter(fn: (r) => r.ifName =~ /\\//)\n  |> filter(fn: (r) => r.router =~ /^${router:regex}$/ and r.ifName =~ /^${ifname:regex}$/)\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: false)\n  |> drop(columns: [\"host\"])\n  |> derivative(unit: 1s, nonNegative: true)\n  |> map(fn: (r) => ({r with _value: r._value * 8.0}))\n\nspeed = from(bucket: \"network\")\n  |> range(start: -1d)\n  |> filter(fn: (r) => r._measurement == \"interface\" and r._field == \"${f_speed}\")\n  |> filter(fn: (r) => r.ifName =~ /\\//)\n  |> filter(fn: (r) => r.router =~ /^${router:regex}$/ and r.ifName =~ /^${ifname:regex}$/)\n  |> last()\n  |> drop(columns: [\"host\"])\n  |> map(fn: (r) => ({r with _time: v.timeRangeStart, _value: float(v: r._value) * ${f_speed_mult}.0}))\n\nunion(tables: [rates, speed])\n  |> group(columns: [\"router\", \"ifName\"])\n  |> pivot(rowKey: [\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n  |> sort(columns: [\"_time\"])\n  |> fill(column: \"${f_speed}\", usePrevious: true)\n  |> filter(fn: (r) => exists r.ifHCInOctets and exists r.ifHCOutOctets and exists r.${f_speed} and r.${f_speed} > 0.0)\n  |> map(fn: (r) => ({_time: r._time, router: r.router, ifName: r.ifName, _value: (if r.ifHCInOctets > r.ifHCOutOctets then r.ifHCInOctets else r.ifHCOutOctets) / r.${f_speed} * 100.0}))",
           "refId": "A"
         }
       ],
-      "title": "Top 5 interfaces (trafic)",
-      "type": "bargauge"
+      "title": "Utilisation des liens dans le temps (%)",
+      "type": "timeseries"
     },
     {
       "datasource": {
-        "default": true,
         "type": "influxdb",
         "uid": "fg2h4oo9wupdsa"
       },
-      "description": "Interfaces ayant des erreurs sur la période. Vide = aucune erreur. N/D = compteurs non collectés.",
+      "description": "Interfaces ayant des erreurs (entrantes + sortantes) sur la période. Aucune ligne = aucune erreur.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -485,7 +513,7 @@
         "h": 4,
         "w": 10,
         "x": 0,
-        "y": 9
+        "y": 10
       },
       "id": 13,
       "options": {
@@ -519,6 +547,223 @@
         "type": "influxdb",
         "uid": "fg2h4oo9wupdsa"
       },
+      "description": "Interfaces activées par l'administrateur (admin up) mais DOWN ou ABSENT. Même logique que l'alerte « Port active mais down ».",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "noValue": "Aucune interface en défaut",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "État"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "ABSENT": {
+                        "color": "orange",
+                        "index": 3,
+                        "text": "ABSENT"
+                      },
+                      "ADMIN DOWN": {
+                        "color": "#6B7280",
+                        "index": 2,
+                        "text": "ADMIN DOWN"
+                      },
+                      "DOWN": {
+                        "color": "red",
+                        "index": 1,
+                        "text": "DOWN"
+                      },
+                      "UP": {
+                        "color": "green",
+                        "index": 0,
+                        "text": "UP"
+                      }
+                    },
+                    "type": "value"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 14,
+        "x": 0,
+        "y": 14
+      },
+      "id": 15,
+      "options": {
+        "cellHeight": "md",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "11.2.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "fg2h4oo9wupdsa"
+          },
+          "query": "rates = from(bucket: \"network\")\n  |> range(start: -5m)\n  |> filter(fn: (r) => r._measurement == \"interface\" and (r._field == \"ifHCInOctets\" or r._field == \"ifHCOutOctets\"))\n  |> filter(fn: (r) => contains(value: r.router, set: ${router:json}))\n  |> filter(fn: (r) => contains(value: r.ifName, set: ${ifname:json}))\n  |> derivative(unit: 1s, nonNegative: true)\n  |> map(fn: (r) => ({r with _value: r._value * 8.0}))\n  |> last()\n  |> map(fn: (r) => ({r with _value: string(v: r._value)}))\n  |> keep(columns: [\"router\", \"ifName\", \"_field\", \"_value\"])\n\nothers = from(bucket: \"network\")\n  |> range(start: -10m)\n  |> filter(fn: (r) => r._measurement == \"interface\" and (r._field == \"ifOperStatus\" or r._field == \"ifAdminStatus\" or r._field == \"${f_speed}\" or r._field == \"ifAlias\"))\n  |> filter(fn: (r) => contains(value: r.router, set: ${router:json}))\n  |> filter(fn: (r) => contains(value: r.ifName, set: ${ifname:json}))\n  |> last()\n  |> map(fn: (r) => ({r with _value: string(v: r._value)}))\n  |> keep(columns: [\"router\", \"ifName\", \"_field\", \"_value\"])\n\nmain = union(tables: [rates, others])\n  |> group()\n  |> pivot(rowKey: [\"router\", \"ifName\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n  |> map(fn: (r) => {\n      inp = if exists r.ifHCInOctets then float(v: r.ifHCInOctets) else 0.0\n      outp = if exists r.ifHCOutOctets then float(v: r.ifHCOutOctets) else 0.0\n      spd = if exists r.${f_speed} then float(v: r.${f_speed}) * ${f_speed_mult}.0 else 0.0\n      adm = if exists r.ifAdminStatus then float(v: r.ifAdminStatus) else 0.0\n      opr = if exists r.ifOperStatus then float(v: r.ifOperStatus) else 0.0\n      return {\n        Routeur: r.router,\n        Interface: r.ifName,\n        Description: if exists r.ifAlias then r.ifAlias else \"\",\n        Etat: if adm != 1.0 then \"ADMIN DOWN\" else if opr == 1.0 then \"UP\" else if opr == 6.0 then \"ABSENT\" else \"DOWN\",\n        Capacite: spd,\n        Entrant: inp,\n        Sortant: outp,\n        Utilisation: if spd > 0.0 then (if inp > outp then inp else outp) / spd * 100.0 else -1.0\n      }\n  })\nmain\n  |> filter(fn: (r) => r.Etat == \"DOWN\" or r.Etat == \"ABSENT\")\n  |> group()\n  |> sort(columns: [\"Routeur\", \"Interface\"])\n  |> keep(columns: [\"Routeur\", \"Interface\", \"Description\", \"Etat\"])\n  |> rename(columns: {Etat: \"État\"})",
+          "refId": "A"
+        }
+      ],
+      "title": "Interfaces en défaut (activées mais pas UP)",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {},
+            "indexByName": {
+              "Description": 2,
+              "Interface": 1,
+              "Routeur": 0,
+              "État": 3
+            },
+            "renameByName": {}
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "fg2h4oo9wupdsa"
+      },
+      "description": "Interfaces qui ont changé d'état UP/DOWN sur la période.",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "noValue": "Aucun changement d'état",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Changements"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#F59E0B",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 10,
+        "x": 14,
+        "y": 14
+      },
+      "id": 14,
+      "options": {
+        "cellHeight": "md",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "11.2.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "fg2h4oo9wupdsa"
+          },
+          "query": "import \"dict\"\n\netats = dict.fromList(pairs: [\n  {key: 1, value: \"UP\"},\n  {key: 2, value: \"DOWN\"},\n  {key: 3, value: \"TESTING\"},\n  {key: 4, value: \"UNKNOWN\"},\n  {key: 5, value: \"DORMANT\"},\n  {key: 6, value: \"NOT PRESENT\"},\n  {key: 7, value: \"LOWER LAYER DOWN\"}\n])\n\nfrom(bucket: \"network\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"interface\" and r._field == \"ifOperStatus\")\n  |> aggregateWindow(every: 15m, fn: last, createEmpty: false)\n  |> filter(fn: (r) => contains(value: r.router, set: ${router:json}))\n  |> filter(fn: (r) => contains(value: r.ifName, set: ${ifname:json}))\n  |> drop(columns: [\"host\"])\n  |> map(fn: (r) => ({r with _value: float(v: r._value)}))\n  |> duplicate(column: \"_value\", as: \"etat\")\n  |> difference(nonNegative: false)\n  |> filter(fn: (r) => r._value != 0.0)\n  |> group(columns: [\"router\", \"ifName\"])\n  |> sort(columns: [\"_time\"])\n  |> reduce(\n      fn: (r, accumulator) => ({\n        n: accumulator.n + 1,\n        last: r._time,\n        etat: r.etat,\n        avant: r.etat - r._value\n      }),\n      identity: {n: 0, last: time(v: 0), etat: 0.0, avant: 0.0}\n  )\n  |> group()\n  |> map(fn: (r) => ({\n      Routeur: r.router,\n      Interface: r.ifName,\n      Changements: r.n,\n      Dernier_changement: r.last,\n      Transition: dict.get(dict: etats, key: int(v: r.avant), default: \"?\") + \" → \" + dict.get(dict: etats, key: int(v: r.etat), default: \"?\")\n  }))\n  |> sort(columns: [\"Changements\"], desc: true)\n  |> limit(n: 10)",
+          "refId": "A"
+        }
+      ],
+      "title": "Interfaces instables (changements d'état)",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "fg2h4oo9wupdsa"
+      },
+      "description": "Toutes les interfaces, triées par utilisation décroissante. Le filtre État permet de masquer les interfaces ADMIN DOWN.",
       "fieldConfig": {
         "defaults": {
           "custom": {
@@ -731,7 +976,7 @@
         "h": 10,
         "w": 24,
         "x": 0,
-        "y": 13
+        "y": 20
       },
       "id": 12,
       "options": {
@@ -745,7 +990,12 @@
           "show": false
         },
         "showHeader": true,
-        "sortBy": []
+        "sortBy": [
+          {
+            "desc": true,
+            "displayName": "Utilisation"
+          }
+        ]
       },
       "pluginVersion": "11.2.0",
       "targets": [
@@ -754,7 +1004,7 @@
             "type": "influxdb",
             "uid": "fg2h4oo9wupdsa"
           },
-          "query": "rates = from(bucket: \"network\")\n  |> range(start: -5m)\n  |> filter(fn: (r) => r._measurement == \"interface\" and (r._field == \"ifHCInOctets\" or r._field == \"ifHCOutOctets\"))\n  |> filter(fn: (r) => contains(value: r.router, set: ${router:json}))\n  |> filter(fn: (r) => contains(value: r.ifName, set: ${ifname:json}))\n  |> derivative(unit: 1s, nonNegative: true)\n  |> map(fn: (r) => ({r with _value: r._value * 8.0}))\n  |> last()\n  |> keep(columns: [\"router\", \"ifName\", \"_field\", \"_value\"])\n\nothers = from(bucket: \"network\")\n  |> range(start: -10m)\n  |> filter(fn: (r) => r._measurement == \"interface\" and (r._field == \"ifOperStatus\" or r._field == \"ifAdminStatus\" or r._field == \"${f_speed}\"))\n  |> filter(fn: (r) => contains(value: r.router, set: ${router:json}))\n  |> filter(fn: (r) => contains(value: r.ifName, set: ${ifname:json}))\n  |> last()\n  |> map(fn: (r) => ({r with _value: float(v: r._value)}))\n  |> keep(columns: [\"router\", \"ifName\", \"_field\", \"_value\"])\n\nunion(tables: [rates, others])\n  |> group()\n  |> pivot(rowKey: [\"router\", \"ifName\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n  |> map(fn: (r) => {\n      inp = if exists r.ifHCInOctets then r.ifHCInOctets else 0.0\n      outp = if exists r.ifHCOutOctets then r.ifHCOutOctets else 0.0\n      spd = if exists r.${f_speed} then r.${f_speed} * ${f_speed_mult}.0 else 0.0\n      adm = if exists r.ifAdminStatus then r.ifAdminStatus else 0.0\n      opr = if exists r.ifOperStatus then r.ifOperStatus else 0.0\n      return {\n        Routeur: r.router,\n        Interface: r.ifName,\n        Etat: if adm != 1.0 then \"ADMIN DOWN\" else if opr == 1.0 then \"UP\" else if opr == 6.0 then \"ABSENT\" else \"DOWN\",\n        Capacite: spd,\n        Entrant: inp,\n        Sortant: outp,\n        Utilisation: if spd > 0.0 then (if inp > outp then inp else outp) / spd * 100.0 else -1.0\n      }\n  })\n  |> group()\n  |> sort(columns: [\"Routeur\", \"Interface\"])\n  |> rename(columns: {Etat: \"État\", Capacite: \"Capacité\", Entrant: \"Trafic In\", Sortant: \"Trafic Out\"})",
+          "query": "rates = from(bucket: \"network\")\n  |> range(start: -5m)\n  |> filter(fn: (r) => r._measurement == \"interface\" and (r._field == \"ifHCInOctets\" or r._field == \"ifHCOutOctets\"))\n  |> filter(fn: (r) => contains(value: r.router, set: ${router:json}))\n  |> filter(fn: (r) => contains(value: r.ifName, set: ${ifname:json}))\n  |> derivative(unit: 1s, nonNegative: true)\n  |> map(fn: (r) => ({r with _value: r._value * 8.0}))\n  |> last()\n  |> map(fn: (r) => ({r with _value: string(v: r._value)}))\n  |> keep(columns: [\"router\", \"ifName\", \"_field\", \"_value\"])\n\nothers = from(bucket: \"network\")\n  |> range(start: -10m)\n  |> filter(fn: (r) => r._measurement == \"interface\" and (r._field == \"ifOperStatus\" or r._field == \"ifAdminStatus\" or r._field == \"${f_speed}\" or r._field == \"ifAlias\"))\n  |> filter(fn: (r) => contains(value: r.router, set: ${router:json}))\n  |> filter(fn: (r) => contains(value: r.ifName, set: ${ifname:json}))\n  |> last()\n  |> map(fn: (r) => ({r with _value: string(v: r._value)}))\n  |> keep(columns: [\"router\", \"ifName\", \"_field\", \"_value\"])\n\nmain = union(tables: [rates, others])\n  |> group()\n  |> pivot(rowKey: [\"router\", \"ifName\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n  |> map(fn: (r) => {\n      inp = if exists r.ifHCInOctets then float(v: r.ifHCInOctets) else 0.0\n      outp = if exists r.ifHCOutOctets then float(v: r.ifHCOutOctets) else 0.0\n      spd = if exists r.${f_speed} then float(v: r.${f_speed}) * ${f_speed_mult}.0 else 0.0\n      adm = if exists r.ifAdminStatus then float(v: r.ifAdminStatus) else 0.0\n      opr = if exists r.ifOperStatus then float(v: r.ifOperStatus) else 0.0\n      return {\n        Routeur: r.router,\n        Interface: r.ifName,\n        Description: if exists r.ifAlias then r.ifAlias else \"\",\n        Etat: if adm != 1.0 then \"ADMIN DOWN\" else if opr == 1.0 then \"UP\" else if opr == 6.0 then \"ABSENT\" else \"DOWN\",\n        Capacite: spd,\n        Entrant: inp,\n        Sortant: outp,\n        Utilisation: if spd > 0.0 then (if inp > outp then inp else outp) / spd * 100.0 else -1.0\n      }\n  })\nmain\n  |> filter(fn: (r) => contains(value: r.Etat, set: ${etat:json}))\n  |> group()\n  |> sort(columns: [\"Routeur\", \"Interface\"])\n  |> rename(columns: {Etat: \"État\", Capacite: \"Capacité\", Entrant: \"Trafic In\", Sortant: \"Trafic Out\"})",
           "refId": "A"
         }
       ],
@@ -765,118 +1015,26 @@
           "options": {
             "excludeByName": {},
             "indexByName": {
-              "Capacité": 3,
+              "Capacité": 4,
+              "Description": 2,
               "Interface": 1,
               "Routeur": 0,
-              "Trafic In": 4,
-              "Trafic Out": 5,
-              "Utilisation": 6,
-              "État": 2
+              "Trafic In": 5,
+              "Trafic Out": 6,
+              "Utilisation": 7,
+              "État": 3
             },
             "renameByName": {}
           }
         }
       ],
       "type": "table"
-    },
-    {
-      "datasource": {
-        "default": true,
-        "type": "influxdb",
-        "uid": "fg2h4oo9wupdsa"
-      },
-      "description": "Interfaces qui ont changé d'état UP/DOWN sur la période.",
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "align": "auto",
-            "cellOptions": {
-              "type": "auto"
-            },
-            "inspect": false
-          },
-          "mappings": [],
-          "noValue": "Aucun changement d'état",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green"
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Changements"
-            },
-            "properties": [
-              {
-                "id": "custom.cellOptions",
-                "value": {
-                  "type": "color-text"
-                }
-              },
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "#F59E0B",
-                  "mode": "fixed"
-                }
-              },
-              {
-                "id": "decimals",
-                "value": 0
-              }
-            ]
-          }
-        ]
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 24,
-        "x": 0,
-        "y": 23
-      },
-      "id": 14,
-      "options": {
-        "cellHeight": "md",
-        "footer": {
-          "countRows": false,
-          "fields": "",
-          "reducer": [
-            "sum"
-          ],
-          "show": false
-        },
-        "showHeader": true
-      },
-      "pluginVersion": "11.2.0",
-      "targets": [
-        {
-          "datasource": {
-            "type": "influxdb",
-            "uid": "fg2h4oo9wupdsa"
-          },
-          "query": "import \"dict\"\n\netats = dict.fromList(pairs: [\n  {key: 1, value: \"UP\"},\n  {key: 2, value: \"DOWN\"},\n  {key: 3, value: \"TESTING\"},\n  {key: 4, value: \"UNKNOWN\"},\n  {key: 5, value: \"DORMANT\"},\n  {key: 6, value: \"NOT PRESENT\"},\n  {key: 7, value: \"LOWER LAYER DOWN\"}\n])\n\nfrom(bucket: \"network\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"interface\" and r._field == \"ifOperStatus\")\n  |> aggregateWindow(every: 15m, fn: last, createEmpty: false)\n  |> filter(fn: (r) => contains(value: r.router, set: ${router:json}))\n  |> filter(fn: (r) => contains(value: r.ifName, set: ${ifname:json}))\n  |> drop(columns: [\"host\"])\n  |> map(fn: (r) => ({r with _value: float(v: r._value)}))\n  |> duplicate(column: \"_value\", as: \"etat\")\n  |> difference(nonNegative: false)\n  |> filter(fn: (r) => r._value != 0.0)\n  |> group(columns: [\"router\", \"ifName\"])\n  |> sort(columns: [\"_time\"])\n  |> reduce(\n      fn: (r, accumulator) => ({\n        n: accumulator.n + 1,\n        last: r._time,\n        etat: r.etat,\n        avant: r.etat - r._value\n      }),\n      identity: {n: 0, last: time(v: 0), etat: 0.0, avant: 0.0}\n  )\n  |> group()\n  |> map(fn: (r) => ({\n      Routeur: r.router,\n      Interface: r.ifName,\n      Changements: r.n,\n      Dernier_changement: r.last,\n      Transition: dict.get(dict: etats, key: int(v: r.avant), default: \"?\") + \" → \" + dict.get(dict: etats, key: int(v: r.etat), default: \"?\")\n  }))\n  |> sort(columns: [\"Changements\"], desc: true)\n  |> limit(n: 10)",
-          "refId": "A"
-        }
-      ],
-      "title": "Interfaces instables (changements d'état)",
-      "type": "table"
     }
   ],
   "refresh": "1m",
   "schemaVersion": 39,
   "tags": [
-    "noc",
-    "network & port"
+    "noc"
   ],
   "templating": {
     "list": [
@@ -937,6 +1095,53 @@
         "type": "query"
       },
       {
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "hide": 0,
+        "includeAll": true,
+        "label": "État",
+        "multi": true,
+        "name": "etat",
+        "options": [
+          {
+            "selected": true,
+            "text": "All",
+            "value": "$__all"
+          },
+          {
+            "selected": false,
+            "text": "UP",
+            "value": "UP"
+          },
+          {
+            "selected": false,
+            "text": "DOWN",
+            "value": "DOWN"
+          },
+          {
+            "selected": false,
+            "text": "ABSENT",
+            "value": "ABSENT"
+          },
+          {
+            "selected": false,
+            "text": "ADMIN DOWN",
+            "value": "ADMIN DOWN"
+          }
+        ],
+        "query": "UP,DOWN,ABSENT,ADMIN DOWN",
+        "queryValue": "",
+        "skipUrlSync": false,
+        "type": "custom"
+      },
+      {
         "hide": 2,
         "label": "Champ capacité du lien",
         "name": "f_speed",
@@ -951,22 +1156,6 @@
         "query": "1000000",
         "skipUrlSync": true,
         "type": "constant"
-      },
-      {
-        "hide": 2,
-        "label": "Champ erreurs entrantes",
-        "name": "f_errin",
-        "query": "ifInErrors",
-        "skipUrlSync": true,
-        "type": "constant"
-      },
-      {
-        "hide": 2,
-        "label": "Champ erreurs sortantes",
-        "name": "f_errout",
-        "query": "ifOutErrors",
-        "skipUrlSync": true,
-        "type": "constant"
       }
     ]
   },
@@ -977,7 +1166,7 @@
   "timepicker": {},
   "timezone": "browser",
   "title": "2- NOC Network & Ports – Trafic, interfaces, capacité",
-  "uid": "noc-network-ports",
-  "version": 31,
+  "uid": "noc-network-portsv2",
+  "version": 10,
   "weekStart": ""
 }

@@ -15,12 +15,27 @@
       }
     ]
   },
-  "description": "Vue d'ensemble de l'infrastructure réseau (tous les routeurs, filtre Routeur)",
+  "description": "Vue d'ensemble de l'infrastructure réseau : tous les routeurs, sans filtre",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
-  "id": 30,
-  "links": [],
+  "id": 36,
+  "links": [
+    {
+      "asDropdown": true,
+      "icon": "external link",
+      "includeVars": false,
+      "keepTime": false,
+      "tags": [
+        "noc"
+      ],
+      "targetBlank": false,
+      "title": "Dashboards NOC",
+      "tooltip": "",
+      "type": "dashboards",
+      "url": ""
+    }
+  ],
   "liveNow": false,
   "panels": [
     {
@@ -28,7 +43,98 @@
         "type": "influxdb",
         "uid": "fg2h4oo9wupdsa"
       },
-      "description": "Routeurs ayant envoyé des données matériel depuis moins de 10 min",
+      "description": "STABLE si : aucun routeur sans données depuis 10 min, tous les ports activés sont UP, aucun défaut matériel, toutes les sauvegardes réussies depuis moins de 26 h et aucun script en échec ou en retard. Les ports activés mais DOWN (A/1, B/1) comptent tant qu'ils ne sont pas confirmés normaux.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "mappings": [
+            {
+              "options": {
+                "0": {
+                  "color": "transparent",
+                  "index": 0,
+                  "text": "STABLE"
+                }
+              },
+              "type": "value"
+            },
+            {
+              "options": {
+                "from": 0.5,
+                "result": {
+                  "color": "transparent",
+                  "index": 1,
+                  "text": "À VÉRIFIER"
+                },
+                "to": 1000000
+              },
+              "type": "range"
+            }
+          ],
+          "noValue": "Aucune donnée",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.2.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "fg2h4oo9wupdsa"
+          },
+          "query": "routers = from(bucket: \"network\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r._measurement == \"hardware_chassis\")\n  |> filter(fn: (r) => not exists r.test or r.test != \"true\")\n  |> keep(columns: [\"_time\", \"router\"])\n  |> group(columns: [\"router\"])\n  |> max(column: \"_time\")\n  |> filter(fn: (r) => r._time < time(v: int(v: now()) - 600000000000))\n  |> group()\n  |> count(column: \"router\")\n  |> rename(columns: {router: \"_value\"})\n  |> map(fn: (r) => ({_value: float(v: r._value)}))\n\nlinks = from(bucket: \"network\")\n  |> range(start: -10m)\n  |> filter(fn: (r) => r._measurement == \"interface\" and (r._field == \"${f_oper}\" or r._field == \"${f_admin}\"))\n  |> last()\n  |> group()\n  |> reduce(\n      identity: {up: 0, total: 0},\n      fn: (r, accumulator) => ({\n        up: if r._field == \"${f_oper}\" and float(v: r._value) == 1.0 then accumulator.up + 1 else accumulator.up,\n        total: if r._field == \"${f_admin}\" and float(v: r._value) == 1.0 then accumulator.total + 1 else accumulator.total\n      })\n  )\n  |> map(fn: (r) => ({_value: float(v: r.total - r.up)}))\n\nhardware = from(bucket: \"network\")\n  |> range(start: -15m)\n  |> filter(fn: (r) => r._measurement == \"hardware_chassis\" and r._field != \"${f_fan_count}\")\n  |> filter(fn: (r) => not exists r.test or r.test != \"true\")\n  |> last()\n  |> group()\n  |> min()\n  |> map(fn: (r) => ({_value: if float(v: r._value) < 1.0 then 1.0 else 0.0}))\n\nbackups = from(bucket: \"network\")\n  |> range(start: -7d)\n  |> filter(fn: (r) => r._measurement == \"backup_status\" and r._field =~ /^(${f_backup_ok})$/)\n  |> filter(fn: (r) => not exists r.test or r.test != \"true\")\n  |> toFloat()\n  |> last()\n  |> map(fn: (r) => ({_value: if r._value < 1.0 or float(v: int(v: now()) - int(v: r._time)) / 1000000000.0 > 93600.0 then 1.0 else 0.0}))\n  |> group()\n  |> sum()\n\nscripts = from(bucket: \"network\")\n  |> range(start: -7d)\n  |> filter(fn: (r) => r._measurement == \"script_run\" and r._field == \"duration_s\")\n  |> filter(fn: (r) => not exists r.test or r.test != \"true\")\n  |> group(columns: [\"script\"])\n  |> last()\n  |> map(fn: (r) => ({_value: if r.status == \"fail\" or float(v: int(v: now()) - int(v: r._time)) / 1000000000.0 > (if r.script == \"topology.py\" or r.script == \"hardware.py\" then 900.0 else 93600.0) then 1.0 else 0.0}))\n  |> group()\n  |> sum()\n\nunion(tables: [routers, links, hardware, backups, scripts])\n  |> group()\n  |> sum()",
+          "refId": "A"
+        }
+      ],
+      "title": "Système",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "fg2h4oo9wupdsa"
+      },
+      "description": "Routeurs ayant envoyé des données matériel depuis moins de 10 min.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -55,11 +161,11 @@
       },
       "gridPos": {
         "h": 4,
-        "w": 3,
-        "x": 0,
+        "w": 4,
+        "x": 3,
         "y": 0
       },
-      "id": 1,
+      "id": 2,
       "options": {
         "colorMode": "value",
         "graphMode": "none",
@@ -74,7 +180,7 @@
           "values": false
         },
         "showPercentChange": false,
-        "textMode": "value",
+        "textMode": "auto",
         "wideLayout": true
       },
       "pluginVersion": "11.2.0",
@@ -84,7 +190,7 @@
             "type": "influxdb",
             "uid": "fg2h4oo9wupdsa"
           },
-          "query": "from(bucket: \"network\")\n  |> range(start: -10m)\n  |> filter(fn: (r) => r._measurement == \"hardware_chassis\")\n  |> filter(fn: (r) => r.router =~ /^${router:regex}$/)\n  |> filter(fn: (r) => not exists r.test or r.test != \"true\")\n  |> keep(columns: [\"router\"])\n  |> group()\n  |> distinct(column: \"router\")\n  |> count()",
+          "query": "from(bucket: \"network\")\n  |> range(start: -10m)\n  |> filter(fn: (r) => r._measurement == \"hardware_chassis\")\n  |> filter(fn: (r) => not exists r.test or r.test != \"true\")\n  |> keep(columns: [\"router\"])\n  |> group()\n  |> distinct(column: \"router\")\n  |> count()",
           "refId": "A"
         }
       ],
@@ -96,7 +202,7 @@
         "type": "influxdb",
         "uid": "fg2h4oo9wupdsa"
       },
-      "description": "Routeurs vus dans les dernières 24 h mais sans données depuis plus de 10 min",
+      "description": "Routeurs vus dans les dernières 24 h mais sans données depuis plus de 10 min.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -133,11 +239,11 @@
       },
       "gridPos": {
         "h": 4,
-        "w": 3,
-        "x": 3,
+        "w": 4,
+        "x": 7,
         "y": 0
       },
-      "id": 2,
+      "id": 3,
       "options": {
         "colorMode": "value",
         "graphMode": "none",
@@ -152,7 +258,7 @@
           "values": false
         },
         "showPercentChange": false,
-        "textMode": "value",
+        "textMode": "auto",
         "wideLayout": true
       },
       "pluginVersion": "11.2.0",
@@ -162,7 +268,7 @@
             "type": "influxdb",
             "uid": "fg2h4oo9wupdsa"
           },
-          "query": "from(bucket: \"network\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r._measurement == \"hardware_chassis\")\n  |> filter(fn: (r) => r.router =~ /^${router:regex}$/)\n  |> filter(fn: (r) => not exists r.test or r.test != \"true\")\n  |> keep(columns: [\"_time\", \"router\"])\n  |> group(columns: [\"router\"])\n  |> max(column: \"_time\")\n  |> filter(fn: (r) => r._time < time(v: int(v: now()) - 600000000000))\n  |> group()\n  |> count(column: \"router\")\n  |> rename(columns: {router: \"_value\"})",
+          "query": "from(bucket: \"network\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r._measurement == \"hardware_chassis\")\n  |> filter(fn: (r) => not exists r.test or r.test != \"true\")\n  |> keep(columns: [\"_time\", \"router\"])\n  |> group(columns: [\"router\"])\n  |> max(column: \"_time\")\n  |> filter(fn: (r) => r._time < time(v: int(v: now()) - 600000000000))\n  |> group()\n  |> count(column: \"router\")\n  |> rename(columns: {router: \"_value\"})\n  |> map(fn: (r) => ({_value: float(v: r._value)}))",
           "refId": "A"
         }
       ],
@@ -174,7 +280,7 @@
         "type": "influxdb",
         "uid": "fg2h4oo9wupdsa"
       },
-      "description": "Ports activés (admin) qui sont réellement UP",
+      "description": "Part des ports activés (admin) qui sont réellement UP.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -207,11 +313,11 @@
       },
       "gridPos": {
         "h": 4,
-        "w": 3,
-        "x": 6,
+        "w": 4,
+        "x": 11,
         "y": 0
       },
-      "id": 3,
+      "id": 4,
       "options": {
         "colorMode": "value",
         "graphMode": "none",
@@ -236,21 +342,21 @@
             "type": "influxdb",
             "uid": "fg2h4oo9wupdsa"
           },
-          "query": "from(bucket: \"network\")\n  |> range(start: -10m)\n  |> filter(fn: (r) => r._measurement == \"interface\" and (r._field == \"${f_oper}\" or r._field == \"${f_admin}\"))\n  |> filter(fn: (r) => r.router =~ /^${router:regex}$/)\n  |> last()\n  |> group()\n  |> reduce(\n      identity: {up: 0, total: 0},\n      fn: (r, accumulator) => ({\n        up: if r._field == \"${f_oper}\" and float(v: r._value) == 1.0 then accumulator.up + 1 else accumulator.up,\n        total: if r._field == \"${f_admin}\" and float(v: r._value) == 1.0 then accumulator.total + 1 else accumulator.total\n      })\n  )\n  |> map(fn: (r) => ({_value: if r.total == 0 then 100.0 else float(v: r.up) * 100.0 / float(v: r.total)}))",
+          "query": "from(bucket: \"network\")\n  |> range(start: -10m)\n  |> filter(fn: (r) => r._measurement == \"interface\" and (r._field == \"${f_oper}\" or r._field == \"${f_admin}\"))\n  |> last()\n  |> group()\n  |> reduce(\n      identity: {up: 0, total: 0},\n      fn: (r, accumulator) => ({\n        up: if r._field == \"${f_oper}\" and float(v: r._value) == 1.0 then accumulator.up + 1 else accumulator.up,\n        total: if r._field == \"${f_admin}\" and float(v: r._value) == 1.0 then accumulator.total + 1 else accumulator.total\n      })\n  )\n  |> map(fn: (r) => ({_value: if r.total == 0 then 100.0 else float(v: r.up) * 100.0 / float(v: r.total)}))",
           "refId": "A"
         }
       ],
-      "title": "Liens UP (ports activés)",
+      "title": "Liens UP",
       "type": "stat"
     },
     {
       "gridPos": {
         "h": 4,
         "w": 3,
-        "x": 9,
+        "x": 15,
         "y": 0
       },
-      "id": 4,
+      "id": 5,
       "options": {
         "alertInstanceLabelFilter": "",
         "alertName": "",
@@ -269,7 +375,7 @@
         },
         "viewMode": "stat"
       },
-      "title": "Alertes actives",
+      "title": "Alertes",
       "type": "alertlist"
     },
     {
@@ -277,38 +383,39 @@
         "type": "influxdb",
         "uid": "fg2h4oo9wupdsa"
       },
-      "description": "Alimentations, ventilateurs et surchauffe du châssis",
+      "description": "Nombre de scripts d'automatisation en échec ou en retard (mesure script_run) : plus de 15 min pour topology.py et hardware.py, plus de 26 h pour backup.py.",
       "fieldConfig": {
         "defaults": {
           "color": {
             "mode": "thresholds"
           },
+          "decimals": 0,
           "mappings": [
             {
               "options": {
                 "0": {
-                  "color": "red",
-                  "index": 1,
-                  "text": "DÉFAUT"
+                  "index": 0,
+                  "text": " OK"
                 },
                 "1": {
-                  "color": "transparent",
-                  "index": 0,
-                  "text": "Aucun défaut"
+                  "color": "light-red",
+                  "index": 1,
+                  "text": "erreur"
                 }
               },
               "type": "value"
             }
           ],
+          "noValue": "Aucune donnée",
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
-                "color": "#EF4444",
+                "color": "green",
                 "value": null
               },
               {
-                "color": "green",
+                "color": "red",
                 "value": 1
               }
             ]
@@ -318,13 +425,13 @@
       },
       "gridPos": {
         "h": 4,
-        "w": 4,
-        "x": 12,
+        "w": 3,
+        "x": 18,
         "y": 0
       },
-      "id": 21,
+      "id": 6,
       "options": {
-        "colorMode": "background",
+        "colorMode": "value",
         "graphMode": "none",
         "justifyMode": "center",
         "orientation": "auto",
@@ -347,154 +454,11 @@
             "type": "influxdb",
             "uid": "fg2h4oo9wupdsa"
           },
-          "query": "from(bucket: \"network\")\n  |> range(start: -15m)\n  |> filter(fn: (r) => r._measurement == \"hardware_chassis\" and r._field != \"${f_fan_count}\")\n  |> filter(fn: (r) => not exists r.test or r.test != \"true\")\n  |> last()\n  |> group()\n  |> min()\n  |> keep(columns: [\"_value\"])",
+          "query": "from(bucket: \"network\")\n  |> range(start: -7d)\n  |> filter(fn: (r) => r._measurement == \"script_run\" and r._field == \"duration_s\")\n  |> filter(fn: (r) => not exists r.test or r.test != \"true\")\n  |> group(columns: [\"script\"])\n  |> last()\n  |> map(fn: (r) => ({_value: if r.status == \"fail\" or float(v: int(v: now()) - int(v: r._time)) / 1000000000.0 > (if r.script == \"topology.py\" or r.script == \"hardware.py\" then 900.0 else 93600.0) then 1.0 else 0.0}))\n  |> group()\n  |> sum()",
           "refId": "A"
         }
       ],
-      "title": "Matériel",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "influxdb",
-        "uid": "fg2h4oo9wupdsa"
-      },
-      "description": "Statut du dernier backup et âge du dernier backup réussi (le pire routeur sélectionné)",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "#EF4444",
-                "value": null
-              },
-              {
-                "color": "#2ECC71",
-                "value": 1
-              }
-            ]
-          }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Statut"
-            },
-            "properties": [
-              {
-                "id": "mappings",
-                "value": [
-                  {
-                    "options": {
-                      "0": {
-                        "color": "red",
-                        "index": 1,
-                        "text": "ÉCHEC"
-                      },
-                      "1": {
-                        "color": "green",
-                        "index": 0,
-                        "text": "OK"
-                      }
-                    },
-                    "type": "value"
-                  }
-                ]
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Age"
-            },
-            "properties": [
-              {
-                "id": "displayName",
-                "value": "Âge"
-              },
-              {
-                "id": "unit",
-                "value": "h"
-              },
-              {
-                "id": "decimals",
-                "value": 0
-              },
-              {
-                "id": "thresholds",
-                "value": {
-                  "mode": "absolute",
-                  "steps": [
-                    {
-                      "color": "#2ECC71",
-                      "value": null
-                    },
-                    {
-                      "color": "#F59E0B",
-                      "value": 26
-                    },
-                    {
-                      "color": "#EF4444",
-                      "value": 30
-                    }
-                  ]
-                }
-              }
-            ]
-          }
-        ]
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 16,
-        "y": 0
-      },
-      "id": 5,
-      "options": {
-        "colorMode": "background",
-        "graphMode": "none",
-        "justifyMode": "center",
-        "orientation": "horizontal",
-        "percentChangeColorMode": "standard",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "showPercentChange": false,
-        "textMode": "value_and_name",
-        "wideLayout": true
-      },
-      "pluginVersion": "11.2.0",
-      "targets": [
-        {
-          "datasource": {
-            "type": "influxdb",
-            "uid": "fg2h4oo9wupdsa"
-          },
-          "query": "from(bucket: \"network\")\n  |> range(start: -3d)\n  |> filter(fn: (r) => r._measurement == \"backup_status\" and r._field =~ /^(${f_backup_ok})$/)\n  |> filter(fn: (r) => r.router =~ /^${router:regex}$/)\n  |> filter(fn: (r) => not exists r.test or r.test != \"true\")\n  |> last()\n  |> group()\n  |> min()\n  |> keep(columns: [\"_value\"])\n  |> rename(columns: {_value: \"Statut\"})",
-          "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "influxdb",
-            "uid": "fg2h4oo9wupdsa"
-          },
-          "query": "from(bucket: \"network\")\n  |> range(start: -14d)\n  |> filter(fn: (r) => r._measurement == \"backup_status\" and r._field =~ /^(${f_backup_ok})$/)\n  |> filter(fn: (r) => r.router =~ /^${router:regex}$/)\n  |> filter(fn: (r) => not exists r.test or r.test != \"true\")\n  |> filter(fn: (r) => float(v: r._value) == 1.0)\n  |> last()\n  |> group()\n  |> min(column: \"_time\")\n  |> map(fn: (r) => ({Age: float(v: int(v: now()) - int(v: r._time)) / 3600000000000.0}))",
-          "refId": "B"
-        }
-      ],
-      "title": "Dernier backup",
+      "title": "Scripts",
       "type": "stat"
     },
     {
@@ -533,8 +497,8 @@
       },
       "gridPos": {
         "h": 4,
-        "w": 4,
-        "x": 20,
+        "w": 3,
+        "x": 21,
         "y": 0
       },
       "id": 7,
@@ -562,11 +526,11 @@
             "type": "influxdb",
             "uid": "fg2h4oo9wupdsa"
           },
-          "query": "from(bucket: \"network\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r._measurement == \"interface\")\n  |> filter(fn: (r) => r.router =~ /^${router:regex}$/)\n  |> last()\n  |> keep(columns: [\"_time\", \"router\"])\n  |> group(columns: [\"router\"])\n  |> max(column: \"_time\")\n  |> group()\n  |> min(column: \"_time\")\n  |> map(fn: (r) => ({_value: float(v: int(v: now()) - int(v: r._time)) / 60000000000.0}))",
+          "query": "from(bucket: \"network\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r._measurement == \"interface\")\n  |> last()\n  |> keep(columns: [\"_time\", \"router\"])\n  |> group(columns: [\"router\"])\n  |> max(column: \"_time\")\n  |> group()\n  |> min(column: \"_time\")\n  |> map(fn: (r) => ({_value: float(v: int(v: now()) - int(v: r._time)) / 60000000000.0}))",
           "refId": "A"
         }
       ],
-      "title": "Dernière collecte",
+      "title": "Collecte",
       "type": "stat"
     },
     {
@@ -574,62 +538,49 @@
         "type": "influxdb",
         "uid": "fg2h4oo9wupdsa"
       },
-      "gridPos": {
-        "h": 8,
-        "w": 9,
-        "x": 0,
-        "y": 4
-      },
-      "id": 8,
-      "options": {
-        "edges": {},
-        "nodes": {}
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "influxdb",
-            "uid": "fg2h4oo9wupdsa"
-          },
-          "query": "from(bucket: \"network\")\n  |> range(start: -15m)\n  |> filter(fn: (r) => r._measurement == \"topology_link\" and r._field == \"up\")\n  |> filter(fn: (r) => r.router =~ /^${router:regex}$/)\n  |> filter(fn: (r) => not exists r.test or r.test != \"true\")\n  |> last()\n  |> group()\n  |> map(fn: (r) => ({a: if r.router < r.neighbor then r.router else r.neighbor, b: if r.router < r.neighbor then r.neighbor else r.router}))\n  |> map(fn: (r) => ({id: r.a + \" -> \" + r.b, source: r.a, target: r.b}))\n  |> unique(column: \"id\")",
-          "refId": "A"
-        }
-      ],
-      "title": "Topologie IS-IS",
-      "type": "nodeGraph"
-    },
-    {
-      "datasource": {
-        "type": "influxdb",
-        "uid": "fg2h4oo9wupdsa"
-      },
+      "description": "Débit entrant et sortant cumulé des ports physiques de chaque routeur (moyenne des 5 dernières minutes).",
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "palette-classic"
+            "mode": "thresholds"
           },
           "custom": {
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            }
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
           },
-          "decimals": 0,
-          "mappings": []
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "bps"
         },
         "overrides": [
           {
             "matcher": {
               "id": "byName",
-              "options": "UP"
+              "options": "Entrant"
             },
             "properties": [
               {
                 "id": "color",
                 "value": {
-                  "fixedColor": "green",
+                  "fixedColor": "semi-dark-green",
                   "mode": "fixed"
+                }
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background"
                 }
               }
             ]
@@ -637,14 +588,20 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "DOWN"
+              "options": "Sortant"
             },
             "properties": [
               {
                 "id": "color",
                 "value": {
-                  "fixedColor": "red",
+                  "fixedColor": "semi-dark-blue",
                   "mode": "fixed"
+                }
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background"
                 }
               }
             ]
@@ -653,51 +610,201 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 5,
-        "x": 9,
+        "w": 12,
+        "x": 0,
         "y": 4
       },
-      "id": 9,
+      "id": 12,
       "options": {
-        "displayLabels": [
-          "percent"
-        ],
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "showLegend": true,
-          "values": [
-            "value"
-          ]
-        },
-        "pieType": "donut",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
           "fields": "",
-          "values": false
+          "reducer": [
+            "sum"
+          ],
+          "show": false
         },
-        "tooltip": {
-          "mode": "single",
-          "sort": "none"
-        }
+        "showHeader": true
       },
+      "pluginVersion": "11.2.0",
       "targets": [
         {
           "datasource": {
             "type": "influxdb",
             "uid": "fg2h4oo9wupdsa"
           },
-          "query": "from(bucket: \"network\")\n  |> range(start: -10m)\n  |> filter(fn: (r) => r._measurement == \"interface\" and (r._field == \"${f_oper}\" or r._field == \"${f_admin}\"))\n  |> filter(fn: (r) => r.router =~ /^${router:regex}$/)\n  |> last()\n  |> group()\n  |> reduce(\n      identity: {up: 0, total: 0},\n      fn: (r, accumulator) => ({\n        up: if r._field == \"${f_oper}\" and float(v: r._value) == 1.0 then accumulator.up + 1 else accumulator.up,\n        total: if r._field == \"${f_admin}\" and float(v: r._value) == 1.0 then accumulator.total + 1 else accumulator.total\n      })\n  )\n  |> map(fn: (r) => ({UP: r.up, DOWN: r.total - r.up}))",
+          "query": "from(bucket: \"network\")\n  |> range(start: -5m)\n  |> filter(fn: (r) => r._measurement == \"interface\")\n  |> filter(fn: (r) => r._field == \"ifHCInOctets\" or r._field == \"ifHCOutOctets\")\n  |> filter(fn: (r) => r.ifName =~ /^[0-9]+\\/[0-9]+\\/[0-9]+$/)\n  |> drop(columns: [\"host\"])\n  |> derivative(unit: 1s, nonNegative: true)\n  |> map(fn: (r) => ({r with _value: r._value * 8.0}))\n  |> last()\n  |> group(columns: [\"router\", \"_field\"])\n  |> sum()\n  |> group()\n  |> pivot(rowKey: [\"router\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n  |> rename(columns: {router: \"Routeur\", ifHCInOctets: \"Entrant\", ifHCOutOctets: \"Sortant\"})",
           "refId": "A"
         }
       ],
-      "title": "État des liens",
-      "type": "piechart"
+      "title": "Débit par routeur",
+      "type": "table"
     },
     {
       "datasource": {
+        "type": "influxdb",
+        "uid": "fg2h4oo9wupdsa"
+      },
+      "description": "Dernière sauvegarde connue de chaque routeur (30 derniers jours). EN RETARD : plus de 26 h. ÉCHEC : dernier point en échec.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "État"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "ECHEC": {
+                        "color": "red",
+                        "index": 1,
+                        "text": "ÉCHEC"
+                      },
+                      "EN RETARD": {
+                        "color": "orange",
+                        "index": 2,
+                        "text": "EN RETARD"
+                      },
+                      "OK": {
+                        "color": "green",
+                        "index": 0,
+                        "text": "OK"
+                      }
+                    },
+                    "type": "value"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Dernière sauvegarde"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "dateTimeAsLocal"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Il y a"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "s"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 4
+      },
+      "id": 11,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": false,
+            "displayName": "Routeur"
+          }
+        ]
+      },
+      "pluginVersion": "11.2.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "fg2h4oo9wupdsa"
+          },
+          "query": "from(bucket: \"network\")\n  |> range(start: -30d)\n  |> filter(fn: (r) => r._measurement == \"backup_status\" and r._field =~ /^(${f_backup_ok})$/)\n  |> filter(fn: (r) => not exists r.test or r.test != \"true\")\n  |> toFloat()\n  |> last()\n  |> map(fn: (r) => {\n      age = float(v: int(v: now()) - int(v: r._time)) / 1000000000.0\n      return {router: r.router, run: r._time, age: age, state: if r._value < 1.0 then \"ECHEC\" else if age > 93600.0 then \"EN RETARD\" else \"OK\"}\n    })\n  |> group()\n  |> sort(columns: [\"router\"])",
+          "refId": "A"
+        }
+      ],
+      "title": "Sauvegardes par routeur",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "result": true,
+              "table": true
+            },
+            "indexByName": {
+              "age": 3,
+              "router": 0,
+              "run": 2,
+              "state": 1
+            },
+            "renameByName": {
+              "age": "Il y a",
+              "router": "Routeur",
+              "run": "Dernière sauvegarde",
+              "state": "État"
+            }
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "default": true,
         "type": "influxdb",
         "uid": "fg2h4oo9wupdsa"
       },
@@ -765,11 +872,11 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 10,
-        "x": 14,
-        "y": 4
+        "w": 24,
+        "x": 0,
+        "y": 12
       },
-      "id": 17,
+      "id": 14,
       "options": {
         "legend": {
           "calcs": [],
@@ -788,7 +895,7 @@
             "type": "influxdb",
             "uid": "fg2h4oo9wupdsa"
           },
-          "query": "from(bucket: \"network\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"backup_status\" and r._field =~ /^(${f_backup_ok})$/)\n  |> filter(fn: (r) => r.router =~ /^${router:regex}$/)\n  |> filter(fn: (r) => not exists r.test or r.test != \"true\")\n  |> aggregateWindow(every: 1d, fn: max, createEmpty: false)\n  |> group(columns: [\"_time\"])\n  |> min()\n  |> group()\n  |> sort(columns: [\"_time\"])\n  |> keep(columns: [\"_time\", \"_value\"])\n  |> rename(columns: {_value: \"Sauvegarde OK\"})",
+          "query": "from(bucket: \"network\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"backup_status\" and r._field =~ /^(${f_backup_ok})$/)\n  |> filter(fn: (r) => not exists r.test or r.test != \"true\")\n  |> aggregateWindow(every: 1d, fn: max, createEmpty: false)\n  |> group(columns: [\"_time\"])\n  |> min()\n  |> group()\n  |> sort(columns: [\"_time\"])\n  |> keep(columns: [\"_time\", \"_value\"])\n  |> rename(columns: {_value: \"Sauvegarde OK\"})",
           "refId": "A"
         }
       ],
@@ -797,13 +904,258 @@
       "type": "timeseries"
     },
     {
-      "gridPos": {
-        "h": 7,
-        "w": 14,
-        "x": 0,
-        "y": 12
+      "datasource": {
+        "default": true,
+        "type": "influxdb",
+        "uid": "fg2h4oo9wupdsa"
       },
-      "id": 18,
+      "description": "Une ligne par routeur et par port SFP supervisé (dernière mesure des 30 dernières minutes).",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "decimals": 2,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Temp SFP (°C)"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "celsius"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green"
+                    },
+                    {
+                      "color": "orange",
+                      "value": 70
+                    },
+                    {
+                      "color": "red",
+                      "value": 90
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Rx (dBm)"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red"
+                    },
+                    {
+                      "color": "orange",
+                      "value": -17
+                    },
+                    {
+                      "color": "green",
+                      "value": -14
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Ventilateurs"
+            },
+            "properties": [
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red"
+                    },
+                    {
+                      "color": "green",
+                      "value": 1
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Statut"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "0": {
+                        "color": "red",
+                        "index": 0,
+                        "text": "DÉFAUT"
+                      },
+                      "1": {
+                        "color": "green",
+                        "index": 1,
+                        "text": "OK"
+                      }
+                    },
+                    "type": "value"
+                  }
+                ]
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red"
+                    },
+                    {
+                      "color": "green",
+                      "value": 1
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 24,
+        "x": 0,
+        "y": 20
+      },
+      "id": 13,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": false,
+            "displayName": "Routeur"
+          }
+        ]
+      },
+      "pluginVersion": "11.2.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "fg2h4oo9wupdsa"
+          },
+          "query": "sfp = from(bucket: \"network\")\n  |> range(start: -30m)\n  |> filter(fn: (r) => r._measurement == \"hardware_sfp\" and r._field =~ /temp|volt|bias|current|rx|tx/)\n  |> filter(fn: (r) => not exists r.test)\n  |> toFloat()\n  |> last()\n  |> map(fn: (r) => ({r with _field: if r._field =~ /temp/ then \"Temp SFP (°C)\" else if r._field =~ /volt/ then \"Tension (V)\" else if r._field =~ /bias|current/ then \"Courant (mA)\" else if r._field =~ /rx/ then \"Rx (dBm)\" else \"Tx (dBm)\"}))\n  |> keep(columns: [\"router\", \"port\", \"_field\", \"_value\"])\n  |> group()\n  |> pivot(rowKey: [\"router\", \"port\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n\nbase = from(bucket: \"network\")\n  |> range(start: -30m)\n  |> filter(fn: (r) => r._measurement == \"hardware_chassis\")\n  |> filter(fn: (r) => not exists r.test)\n  |> toFloat()\n  |> last()\n\nfans = base\n  |> filter(fn: (r) => r._field == \"fan_count\")\n  |> keep(columns: [\"router\", \"_value\"])\n  |> rename(columns: {_value: \"Ventilateurs\"})\n  |> group()\n\nstatus = base\n  |> filter(fn: (r) => r._field != \"fan_count\")\n  |> group(columns: [\"router\"])\n  |> min()\n  |> keep(columns: [\"router\", \"_value\"])\n  |> rename(columns: {_value: \"Statut\"})\n  |> group()\n\nchassis = join(tables: {f: fans, s: status}, on: [\"router\"])\n\njoin(tables: {a: sfp, b: chassis}, on: [\"router\"])\n  |> yield(name: \"hardware\")",
+          "refId": "A"
+        }
+      ],
+      "title": "État du matériel par routeur",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "_start": true,
+              "_stop": true,
+              "result": true,
+              "table": true
+            },
+            "renameByName": {
+              "port": "Port",
+              "router": "Routeur"
+            }
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "gridPos": {
+        "h": 6,
+        "w": 24,
+        "x": 0,
+        "y": 26
+      },
+      "id": 9,
       "options": {
         "alertInstanceLabelFilter": "",
         "alertName": "",
@@ -824,213 +1176,15 @@
       },
       "title": "Alertes en cours",
       "type": "alertlist"
-    },
-    {
-      "datasource": {
-        "type": "influxdb",
-        "uid": "fg2h4oo9wupdsa"
-      },
-      "description": "",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "custom": {
-            "align": "auto",
-            "cellOptions": {
-              "type": "auto"
-            },
-            "inspect": false
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          },
-          "unit": "bps"
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Sortant"
-            },
-            "properties": [
-              {
-                "id": "custom.cellOptions",
-                "value": {
-                  "applyToRow": false,
-                  "type": "color-background",
-                  "wrapText": false
-                }
-              },
-              {
-                "id": "displayName",
-                "value": "Sortant"
-              },
-              {
-                "id": "color",
-                "value": {
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Entrant"
-            },
-            "properties": [
-              {
-                "id": "displayName",
-                "value": "Entrant"
-              },
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "semi-dark-green",
-                  "mode": "fixed"
-                }
-              },
-              {
-                "id": "custom.cellOptions",
-                "value": {
-                  "applyToRow": false,
-                  "type": "color-background",
-                  "wrapText": false
-                }
-              }
-            ]
-          }
-        ]
-      },
-      "gridPos": {
-        "h": 7,
-        "w": 10,
-        "x": 14,
-        "y": 12
-      },
-      "id": 20,
-      "options": {
-        "cellHeight": "sm",
-        "footer": {
-          "countRows": false,
-          "fields": "",
-          "reducer": [
-            "sum"
-          ],
-          "show": false
-        },
-        "showHeader": true
-      },
-      "pluginVersion": "11.2.0",
-      "targets": [
-        {
-          "datasource": {
-            "type": "influxdb",
-            "uid": "fg2h4oo9wupdsa"
-          },
-          "query": "from(bucket: \"network\")\n  |> range(start: -5m)\n  |> filter(fn: (r) => r._measurement == \"interface\")\n  |> filter(fn: (r) => r.router =~ /^${router:regex}$/)\n  |> filter(fn: (r) => r._field == \"ifHCInOctets\" or r._field == \"ifHCOutOctets\")\n  |> filter(fn: (r) => r.ifName =~ /^[0-9]+\\/[0-9]+\\/[0-9]+$/)\n  |> drop(columns: [\"host\"])\n  |> derivative(unit: 1s, nonNegative: true)\n  |> map(fn: (r) => ({r with _value: r._value * 8.0}))\n  |> last()\n  |> group(columns: [\"router\", \"_field\"])\n  |> sum()\n  |> group()\n  |> pivot(rowKey: [\"router\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n  |> rename(columns: {router: \"Routeur\", ifHCInOctets: \"Entrant\", ifHCOutOctets: \"Sortant\"})",
-          "refId": "A"
-        }
-      ],
-      "title": "Débit par routeur",
-      "type": "table"
-    },
-    {
-      "gridPos": {
-        "h": 8,
-        "w": 24,
-        "x": 0,
-        "y": 19
-      },
-      "id": 11,
-      "options": {
-        "alertInstanceLabelFilter": "",
-        "alertName": "",
-        "dashboardAlerts": false,
-        "groupBy": [],
-        "groupMode": "default",
-        "maxItems": 10,
-        "showInstances": true,
-        "sortOrder": 5,
-        "stateFilter": {
-          "error": true,
-          "firing": true,
-          "noData": true,
-          "normal": true,
-          "pending": true
-        },
-        "viewMode": "list"
-      },
-      "title": "Incidents récents (état des règles)",
-      "type": "alertlist"
     }
   ],
   "refresh": "1m",
   "schemaVersion": 39,
   "tags": [
-    "vue globale",
     "noc"
   ],
   "templating": {
     "list": [
-      {
-        "current": {
-          "selected": true,
-          "text": [
-            "All"
-          ],
-          "value": [
-            "$__all"
-          ]
-        },
-        "datasource": {
-          "type": "influxdb",
-          "uid": "fg2h4oo9wupdsa"
-        },
-        "definition": "import \"influxdata/influxdb/schema\"\nschema.tagValues(bucket: \"network\", tag: \"router\", start: -30d)",
-        "description": "Choisir un ou plusieurs routeurs",
-        "hide": 0,
-        "includeAll": true,
-        "label": "Routeur",
-        "multi": true,
-        "name": "router",
-        "options": [],
-        "query": "import \"influxdata/influxdb/schema\"\nschema.tagValues(bucket: \"network\", tag: \"router\", start: -30d)",
-        "refresh": 2,
-        "regex": "",
-        "skipUrlSync": false,
-        "sort": 1,
-        "type": "query"
-      },
-      {
-        "hide": 2,
-        "label": "Champ octets entrants",
-        "name": "f_in",
-        "query": "ifHCInOctets",
-        "skipUrlSync": true,
-        "type": "constant"
-      },
-      {
-        "hide": 2,
-        "label": "Champ octets sortants",
-        "name": "f_out",
-        "query": "ifHCOutOctets",
-        "skipUrlSync": true,
-        "type": "constant"
-      },
       {
         "hide": 2,
         "label": "Champ état réel",
@@ -1044,30 +1198,6 @@
         "label": "Champ état admin",
         "name": "f_admin",
         "query": "ifAdminStatus",
-        "skipUrlSync": true,
-        "type": "constant"
-      },
-      {
-        "hide": 2,
-        "label": "Regex champ température SFP",
-        "name": "f_temp",
-        "query": "temp",
-        "skipUrlSync": true,
-        "type": "constant"
-      },
-      {
-        "hide": 2,
-        "label": "Regex champ tension SFP",
-        "name": "f_volt",
-        "query": "volt",
-        "skipUrlSync": true,
-        "type": "constant"
-      },
-      {
-        "hide": 2,
-        "label": "Regex champ courant laser",
-        "name": "f_bias",
-        "query": "bias|current|courant",
         "skipUrlSync": true,
         "type": "constant"
       },
@@ -1095,8 +1225,8 @@
   },
   "timepicker": {},
   "timezone": "browser",
-  "title": "1- NOC Daily – POP Network (multi-routeurs)",
-  "uid": "noc-daily-pop-v2",
-  "version": 16,
+  "title": "1- NOC Daily – POP Network",
+  "uid": "noc-daily-pop-v1",
+  "version": 13,
   "weekStart": ""
 }
